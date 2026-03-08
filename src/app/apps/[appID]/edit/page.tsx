@@ -34,6 +34,7 @@ const VISIBILITY_KEYS: Record<SectionId, keyof AppFormState | null> = {
   free_text: 'free_text_visible',
   users_voice: 'users_voice_visible',
   featured: 'featured_visible',
+  inquiry: 'inquiry_visible',
   developer: null,
   support: 'support_visible',
   footer: null,
@@ -190,6 +191,8 @@ export default function StudioAppEditPage() {
       users_voice_display_order: parseJsonArray(r.users_voice_display_order, []).map(String),
       featured_visible: Boolean(r.featured_visible),
       featured_items: parseFeaturedItems(r.featured_items),
+      inquiry_visible: Boolean(r.inquiry_visible),
+      inquiry_url: String(r.inquiry_url ?? ''),
       developer_icon_url: String(r.developer_icon_url ?? ''),
       developer_name: String(r.developer_name ?? ''),
       developer_bio: String(r.developer_bio ?? ''),
@@ -243,6 +246,8 @@ export default function StudioAppEditPage() {
       users_voice_display_order: form.users_voice_display_order,
       featured_visible: form.featured_visible,
       featured_items: form.featured_items,
+      inquiry_visible: form.inquiry_visible,
+      inquiry_url: form.inquiry_url.trim() || null,
       developer_icon_url: form.developer_icon_url.trim() || null,
       developer_name: form.developer_name.trim() || null,
       developer_bio: form.developer_bio.trim() || null,
@@ -856,6 +861,21 @@ export default function StudioAppEditPage() {
                     + 関連記事を追加
                   </button>
                 </>
+              )}
+
+              {focusedSection === 'inquiry' && (
+                <div>
+                  <label className={LABEL_CLASS}>問い合わせ先</label>
+                  <input
+                    type="text"
+                    value={form.inquiry_url}
+                    onChange={(e) =>
+                      updateForm({ inquiry_url: e.target.value })
+                    }
+                    placeholder="URLを入力"
+                    className={INPUT_CLASS}
+                  />
+                </div>
               )}
 
               {focusedSection === 'developer' && (

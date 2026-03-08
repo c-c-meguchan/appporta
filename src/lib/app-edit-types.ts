@@ -8,6 +8,7 @@ export type SectionId =
   | 'free_text'
   | 'users_voice'
   | 'featured'
+  | 'inquiry'
   | 'developer'
   | 'support'
   | 'footer';
@@ -31,6 +32,7 @@ export const SECTIONS: SectionConfig[] = [
   { id: 'free_text', name: 'Free Text', nameJa: '自由文', necessary: 'optional' },
   { id: 'users_voice', name: "Users' voice", nameJa: 'ユーザーの声', necessary: 'optional' },
   { id: 'featured', name: 'Featured', nameJa: '関連記事', necessary: 'optional' },
+  { id: 'inquiry', name: 'Inquiry', nameJa: 'お問い合わせ', necessary: 'optional' },
   { id: 'developer', name: 'Developer', nameJa: '開発者', necessary: 'required' },
   { id: 'support', name: 'Support', nameJa: 'サポート', necessary: 'optional' },
   { id: 'footer', name: 'Footer', nameJa: 'フッター', necessary: 'required' },
@@ -74,6 +76,8 @@ export type AppFormState = {
   users_voice_display_order: string[];
   featured_visible: boolean;
   featured_items: FeaturedItem[];
+  inquiry_visible: boolean;
+  inquiry_url: string;
   developer_icon_url: string;
   developer_name: string;
   developer_bio: string;
@@ -115,6 +119,8 @@ export const defaultFormState: AppFormState = {
   users_voice_display_order: [],
   featured_visible: false,
   featured_items: [],
+  inquiry_visible: false,
+  inquiry_url: '',
   developer_icon_url: '',
   developer_name: '',
   developer_bio: '',

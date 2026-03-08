@@ -74,6 +74,8 @@ export function appRowToFormState(r: Record<string, unknown>): AppFormState {
     users_voice_display_order: parseJsonArray(r.users_voice_display_order, []).map(String),
     featured_visible: Boolean(r.featured_visible),
     featured_items: parseFeaturedItems(r.featured_items),
+    inquiry_visible: Boolean(r.inquiry_visible),
+    inquiry_url: String(r.inquiry_url ?? ''),
     developer_icon_url: String(r.developer_icon_url ?? ''),
     developer_name: String(r.developer_name ?? ''),
     developer_bio: String(r.developer_bio ?? ''),

@@ -536,6 +536,39 @@ export function AppPageView({ data: d, reviews = [], preview, onSectionFocus, fo
           </SectionWrapper>
         )}
 
+        {/* お問い合わせ */}
+        {d.inquiry_visible && d.inquiry_url.trim() && (
+          <SectionWrapper
+            sectionId="inquiry"
+            preview={preview}
+            onSectionFocus={onSectionFocus}
+            focusedSectionId={focusedSectionId}
+            className="-mx-2 px-2"
+          >
+          <section className="py-6 border-t-[0.7px] border-zinc-200 dark:border-zinc-800">
+            <h2 className="text-lg font-semibold">お問い合わせ</h2>
+            <div className="mt-3">
+              <a
+                href={
+                  preview
+                    ? '#'
+                    : (() => {
+                        const u = d.inquiry_url.trim();
+                        if (u.startsWith('mailto:') || u.startsWith('tel:')) return u;
+                        return ensureAbsoluteUrl(u);
+                      })()
+                }
+                target={preview || d.inquiry_url.trim().startsWith('mailto:') || d.inquiry_url.trim().startsWith('tel:') ? undefined : '_blank'}
+                rel="noopener noreferrer"
+                className="inline-flex rounded-lg border-[0.7px] border-zinc-300 bg-zinc-100 px-4 py-2.5 text-sm font-medium transition hover:bg-zinc-200 dark:border-zinc-700 dark:bg-zinc-800 dark:hover:bg-zinc-700"
+              >
+                お問い合わせ
+              </a>
+            </div>
+          </section>
+          </SectionWrapper>
+        )}
+
         {/* Developer */}
         <SectionWrapper
           sectionId="developer"
