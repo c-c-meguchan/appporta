@@ -170,41 +170,20 @@ export function AppPageView({ data: d, reviews = [], preview, onSectionFocus, fo
 
   return (
     <div className="min-h-screen bg-white text-zinc-900 dark:bg-zinc-950 dark:text-zinc-50">
-      {/* Nav Bar */}
-      <SectionWrapper
-        sectionId="nav_bar"
-        preview={preview}
-        onSectionFocus={onSectionFocus}
-        focusedSectionId={focusedSectionId}
-      >
-        <header className="sticky top-0 z-10 flex items-center justify-between border-b-[0.7px] border-zinc-200 bg-white/95 px-4 py-3 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/95">
-          <a href={preview ? '#' : '/'} className="text-lg font-semibold">
-            AppPorta
-          </a>
-          <button
-            type="button"
-            className="flex h-9 w-9 flex-col items-center justify-center gap-1 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800"
-            aria-label="メニュー"
-          >
-            <span className="block h-0.5 w-4 rounded-full bg-current" />
-            <span className="block h-0.5 w-4 rounded-full bg-current" />
-            <span className="block h-0.5 w-4 rounded-full bg-current" />
-          </button>
-        </header>
-        {d.nav_items.length > 0 && (
-          <nav className="flex gap-4 border-b-[0.7px] border-zinc-200 px-4 py-2 dark:border-zinc-800">
-            {d.nav_items.map((item, i) => (
-              <a
-                key={i}
-                href={preview ? '#' : ensureAbsoluteUrl(item.href)}
-                className="text-sm text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50"
-              >
-                {item.label || `項目${i + 1}`}
-              </a>
-            ))}
-          </nav>
-        )}
-      </SectionWrapper>
+      <header className="sticky top-0 z-10 flex items-center justify-between border-b-[0.7px] border-zinc-200 bg-white/95 px-4 py-3 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/95">
+        <a href={preview ? '#' : '/'} className="text-lg font-semibold">
+          AppPorta
+        </a>
+        <button
+          type="button"
+          className="flex h-9 w-9 flex-col items-center justify-center gap-1 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800"
+          aria-label="メニュー"
+        >
+          <span className="block h-0.5 w-4 rounded-full bg-current" />
+          <span className="block h-0.5 w-4 rounded-full bg-current" />
+          <span className="block h-0.5 w-4 rounded-full bg-current" />
+        </button>
+      </header>
 
       <main className="mx-auto max-w-3xl px-4 py-8">
         {/* Hero Header */}

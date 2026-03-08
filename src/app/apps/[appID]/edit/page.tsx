@@ -25,7 +25,6 @@ function ArrowLeftIcon({ className }: { className?: string }) {
 }
 
 const VISIBILITY_KEYS: Record<SectionId, keyof AppFormState | null> = {
-  nav_bar: null,
   hero_header: null,
   app_specs: null,
   version: 'version_visible',
@@ -51,14 +50,6 @@ function parseJsonArray(val: unknown, fallback: any[]): any[] {
     }
   }
   return fallback;
-}
-
-function parseNavItems(val: unknown): { label: string; href: string }[] {
-  const a = parseJsonArray(val, []);
-  return a.map((x: any) => ({
-    label: typeof x?.label === 'string' ? x.label : '',
-    href: typeof x?.href === 'string' ? x.href : '',
-  }));
 }
 
 function parseReleaseNotes(val: unknown): { version: string; body: string }[] {
@@ -164,7 +155,6 @@ export default function StudioAppEditPage() {
 
     const r = data as Record<string, unknown>;
     setForm({
-      nav_items: parseNavItems(r.nav_items),
       name: String(r.name ?? ''),
       catch_copy: String(r.catch_copy ?? ''),
       icon_url: String(r.icon_url ?? ''),
@@ -227,7 +217,6 @@ export default function StudioAppEditPage() {
       price_currency: form.price_currency || null,
       price_value: form.price_value.trim() || null,
       primary_link: form.primary_link.trim() || null,
-      nav_items: form.nav_items,
       os_support: form.os_support.trim() || null,
       apple_silicon: form.apple_silicon,
       file_size: form.file_size.trim() || null,
@@ -481,48 +470,6 @@ export default function StudioAppEditPage() {
                 })()}
 
             <div className="space-y-4">
-              {focusedSection === 'nav_bar' && (
-                <>
-                  {form.nav_items.map((item, i) => (
-                    <div key={i} className="flex gap-2">
-                      <input
-                        type="text"
-                        value={item.label}
-                        onChange={(e) => {
-                          const next = [...form.nav_items];
-                          next[i] = { ...next[i], label: e.target.value };
-                          updateForm({ nav_items: next });
-                        }}
-                        placeholder="ラベル"
-                        className={INPUT_CLASS}
-                      />
-                      <input
-                        type="text"
-                        value={item.href}
-                        onChange={(e) => {
-                          const next = [...form.nav_items];
-                          next[i] = { ...next[i], href: e.target.value };
-                          updateForm({ nav_items: next });
-                        }}
-                        placeholder="URL"
-                        className={INPUT_CLASS}
-                      />
-                    </div>
-                  ))}
-                  <button
-                    type="button"
-                    onClick={() =>
-                      updateForm({
-                        nav_items: [...form.nav_items, { label: '', href: '' }],
-                      })
-                    }
-                    className="text-sm text-zinc-600 underline dark:text-zinc-400"
-                  >
-                    + 項目を追加
-                  </button>
-                </>
-              )}
-
               {focusedSection === 'hero_header' && (
                 <>
                   <ImageUploadInput

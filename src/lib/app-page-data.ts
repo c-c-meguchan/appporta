@@ -1,4 +1,4 @@
-import type { AppFormState, NavItem, ReleaseNote, FeaturedItem } from '@/lib/app-edit-types';
+import type { AppFormState, ReleaseNote, FeaturedItem } from '@/lib/app-edit-types';
 import { defaultFormState } from '@/lib/app-edit-types';
 
 function parseJsonArray(val: unknown, fallback: any[]): any[] {
@@ -12,14 +12,6 @@ function parseJsonArray(val: unknown, fallback: any[]): any[] {
     }
   }
   return fallback;
-}
-
-function parseNavItems(val: unknown): NavItem[] {
-  const a = parseJsonArray(val, []);
-  return a.map((x: any) => ({
-    label: typeof x?.label === 'string' ? x.label : '',
-    href: typeof x?.href === 'string' ? x.href : '',
-  }));
 }
 
 function parseReleaseNotes(val: unknown): ReleaseNote[] {
@@ -47,7 +39,6 @@ function parseFeaturedItems(val: unknown): FeaturedItem[] {
 export function appRowToFormState(r: Record<string, unknown>): AppFormState {
   return {
     ...defaultFormState,
-    nav_items: parseNavItems(r.nav_items),
     name: String(r.name ?? ''),
     catch_copy: String(r.catch_copy ?? ''),
     icon_url: String(r.icon_url ?? ''),
@@ -84,8 +75,8 @@ export function appRowToFormState(r: Record<string, unknown>): AppFormState {
     developer_contact_url: String(r.developer_contact_url ?? ''),
     support_visible: Boolean(r.support_visible),
     buy_me_a_coffee_url: String(r.buy_me_a_coffee_url ?? ''),
-    meta_title: String(r.meta_title ?? ''),
-    meta_description: String(r.meta_description ?? ''),
-    meta_cover_image_url: String(r.meta_cover_image_url ?? ''),
+    meta_title: String(r.name ?? r.meta_title ?? ''),
+    meta_description: String(r.catch_copy ?? r.meta_description ?? ''),
+    meta_cover_image_url: String(r.icon_url ?? r.meta_cover_image_url ?? ''),
   };
 }

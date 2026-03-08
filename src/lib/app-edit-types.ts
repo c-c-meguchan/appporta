@@ -1,5 +1,4 @@
 export type SectionId =
-  | 'nav_bar'
   | 'hero_header'
   | 'app_specs'
   | 'version'
@@ -23,7 +22,6 @@ export type SectionConfig = {
 };
 
 export const SECTIONS: SectionConfig[] = [
-  { id: 'nav_bar', name: 'Nav Bar', nameJa: 'ナビ', necessary: 'required' },
   { id: 'hero_header', name: 'Hero Header', nameJa: 'ヒーロー', necessary: 'required' },
   { id: 'app_specs', name: 'App Specs', nameJa: 'アプリ仕様', necessary: 'required' },
   { id: 'version', name: 'Version', nameJa: 'バージョン', necessary: 'optional' },
@@ -38,7 +36,6 @@ export const SECTIONS: SectionConfig[] = [
   { id: 'footer', name: 'Footer', nameJa: 'フッター', necessary: 'required' },
 ];
 
-export type NavItem = { label: string; href: string };
 export type ReleaseNote = { version: string; body: string };
 export type FeaturedItem = {
   url: string;
@@ -49,7 +46,6 @@ export type FeaturedItem = {
 };
 
 export type AppFormState = {
-  nav_items: NavItem[];
   name: string;
   catch_copy: string;
   icon_url: string;
@@ -92,7 +88,6 @@ export type AppFormState = {
 };
 
 export const defaultFormState: AppFormState = {
-  nav_items: [],
   name: '',
   catch_copy: '',
   icon_url: '',

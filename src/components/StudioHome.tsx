@@ -83,7 +83,7 @@ export default function StudioHome() {
 
   return (
     <div className="flex min-h-screen bg-zinc-50 dark:bg-black">
-      {/* 左カラム: ユーザー情報 + ナビ */}
+      {/* 左カラム: ユーザー情報 */}
       <aside className="flex w-56 flex-shrink-0 flex-col border-r border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
         <div className="flex flex-col gap-4 p-4">
           <Link href="/apps" className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
