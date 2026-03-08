@@ -1,5 +1,7 @@
 /** appporta.com/{appID} で使用不可の予約語（小文字で比較） */
 export const RESERVED_APP_IDS = new Set([
+  'app',
+  'apps',
   'login',
   'signup',
   'studio',
@@ -9,6 +11,9 @@ export const RESERVED_APP_IDS = new Set([
   'blog',
   'docs',
   'api',
+  'dev',
+  'explore',
+  'search',
   'pricing',
   'contact',
   'support',
@@ -18,10 +23,33 @@ export const RESERVED_APP_IDS = new Set([
   'press',
   'security',
   'legal',
+  'news',
 ]);
 
 export function isReservedAppId(value: string): boolean {
   return RESERVED_APP_IDS.has(value.toLowerCase());
+}
+
+/** 公開URLスラッグとして有効か（a-z, 0-9, - のみ・2文字以上・予約語でない） */
+export const APP_ID_SLUG_REGEX = /^[a-z0-9-]+$/;
+
+export function validateAppIdSlug(
+  value: string
+): { valid: true } | { valid: false; error: string } {
+  const trimmed = value.trim().toLowerCase();
+  if (trimmed.length === 0) {
+    return { valid: false, error: 'アプリIDを入力してください。' };
+  }
+  if (trimmed.length === 1) {
+    return { valid: false, error: 'アプリIDは2文字以上で入力してください。' };
+  }
+  if (!APP_ID_SLUG_REGEX.test(trimmed)) {
+    return { valid: false, error: '小文字英数字とハイフンのみ使用できます。' };
+  }
+  if (isReservedAppId(trimmed)) {
+    return { valid: false, error: 'この文字列は使用できません。' };
+  }
+  return { valid: true };
 }
 
 const STUDIO_HOSTS = ['studio.appporta.com', 'studio.localhost'];
