@@ -27,7 +27,6 @@ type AppPageViewProps = {
   focusedSectionId?: SectionId | null;
   /** 公開ページでの投稿フォーム用 */
   appID?: string;
-  onReviewSubmitted?: (review: ReviewItem) => void;
 };
 
 function useHorizontalFade() {
@@ -171,7 +170,7 @@ function SectionWrapper({
   );
 }
 
-export function AppPageView({ data: d, reviews = [], preview, onSectionFocus, focusedSectionId, appID, onReviewSubmitted }: AppPageViewProps) {
+export function AppPageView({ data: d, reviews = [], preview, onSectionFocus, focusedSectionId, appID }: AppPageViewProps) {
   const embedUrl = embedVideoUrl(ensureAbsoluteUrl(d.video_url));
   const galleryUrls = d.gallery_image_urls.filter(Boolean);
   const { ref: galleryScrollRef, atStart: galleryAtStart, atEnd: galleryAtEnd } = useHorizontalFade();
@@ -497,7 +496,6 @@ export function AppPageView({ data: d, reviews = [], preview, onSectionFocus, fo
                 appID={appID}
                 open={showTestimonialForm}
                 onClose={() => setShowTestimonialForm(false)}
-                onSubmitted={onReviewSubmitted}
               />
             )}
             {expandedReview && (

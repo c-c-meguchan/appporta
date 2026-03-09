@@ -5,8 +5,6 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { useAppHeaderData } from '@/hooks/useAppHeaderData';
 
-type TestimonialChange = { id: string; is_public: boolean };
-
 type AppChangesContextValue = {
   editDirty: boolean;
   setEditDirty: (v: boolean) => void;
@@ -21,6 +19,7 @@ type AppChangesContextValue = {
   testimonialsDirty: boolean;
   pendingTestimonialChanges: Map<string, boolean>;
   stageTestimonialChange: (id: string, is_public: boolean) => void;
+  unstageTestimonialChange: (id: string) => void;
   applyTestimonialChanges: () => Promise<void>;
   clearTestimonialChanges: () => void;
 };
@@ -120,6 +119,15 @@ export function AppChangesProvider({ appID, children }: AppChangesProviderProps)
     });
   }, []);
 
+  const unstageTestimonialChange = useCallback((id: string) => {
+    setPendingTestimonialChanges((prev) => {
+      if (!prev.has(id)) return prev;
+      const next = new Map(prev);
+      next.delete(id);
+      return next;
+    });
+  }, []);
+
   const applyTestimonialChanges = useCallback(async () => {
     const entries = Array.from(pendingTestimonialChanges.entries());
     if (entries.length === 0) return;
@@ -149,6 +157,7 @@ export function AppChangesProvider({ appID, children }: AppChangesProviderProps)
     testimonialsDirty,
     pendingTestimonialChanges,
     stageTestimonialChange,
+    unstageTestimonialChange,
     applyTestimonialChanges,
     clearTestimonialChanges,
   };

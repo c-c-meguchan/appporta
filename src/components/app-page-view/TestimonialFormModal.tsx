@@ -8,16 +8,9 @@ type TestimonialFormModalProps = {
   appID: string;
   open: boolean;
   onClose: () => void;
-  onSubmitted?: (review: {
-    id: string;
-    user_icon_url: string | null;
-    user_name: string;
-    content: string;
-    created_at: string;
-  }) => void;
 };
 
-export function TestimonialFormModal({ appID, open, onClose, onSubmitted }: TestimonialFormModalProps) {
+export function TestimonialFormModal({ appID, open, onClose }: TestimonialFormModalProps) {
   const [userName, setUserName] = useState('');
   const [content, setContent] = useState('');
   const [secretMessage, setSecretMessage] = useState('');
@@ -27,7 +20,6 @@ export function TestimonialFormModal({ appID, open, onClose, onSubmitted }: Test
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const placeholderName = PLACEHOLDER_NAME;
 
   if (!open) return null;
 
@@ -66,7 +58,6 @@ export function TestimonialFormModal({ appID, open, onClose, onSubmitted }: Test
       }
 
       setSubmitted(true);
-      onSubmitted?.(json.review);
     } catch {
       setError('通信エラーが発生しました');
     } finally {
@@ -181,7 +172,7 @@ export function TestimonialFormModal({ appID, open, onClose, onSubmitted }: Test
                   required
                   value={userName}
                   onChange={(e) => setUserName(e.target.value)}
-                  placeholder={placeholderName}
+                  placeholder={PLACEHOLDER_NAME}
                   className="w-full rounded-lg border-[0.7px] border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-900 outline-none transition placeholder:text-zinc-400 focus:border-zinc-400 focus:bg-white dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50 dark:placeholder:text-zinc-500 dark:focus:border-zinc-500 dark:focus:bg-zinc-800"
                 />
               </div>
