@@ -22,11 +22,18 @@ function GearIcon({ className }: { className?: string }) {
   );
 }
 
-function ChartIcon({ className }: { className?: string }) {
+function EqualizerIcon({ className }: { className?: string }) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden>
-      <path fillRule="evenodd" d="M15.22 6.268a.75.75 0 0 1 .966-.032l3.97 2.94a2.25 2.25 0 0 1 1.025 1.885v.097a.75.75 0 0 1-1.5 0v-.097a.75.75 0 0 0-.375-.65l-3.97-2.94a.75.75 0 0 1-.032-.966Z" clipRule="evenodd" />
-      <path fillRule="evenodd" d="M12.75 3a.75.75 0 0 1 .75-.75h7.5a.75.75 0 0 1 .75.75v7.5a.75.75 0 0 1-1.5 0V4.81L8.97 9.53a.75.75 0 0 1-1.06-1.06l4.5-4.5a.75.75 0 0 1 .34-.19Zm-3 6a.75.75 0 0 1 .75.75v6.44l1.72-1.72a.75.75 0 1 1 1.06 1.06l-3 3a.75.75 0 0 1-1.06 0l-3-3a.75.75 0 1 1 1.06-1.06l1.72 1.72V9.75a.75.75 0 0 1 .75-.75Z" clipRule="evenodd" />
+      <path d="M10 20h4V4h-4v16zm-6 0h4v-8H4v8zM16 9v11h4V9h-4z" />
+    </svg>
+  );
+}
+
+function ChatBubbleIcon({ className }: { className?: string }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden>
+      <path fillRule="evenodd" d="M4.848 2.771A49.144 49.144 0 0 1 12 2.25c2.43 0 4.817.178 7.152.52 1.978.29 3.348 2.024 3.348 3.97v6.02c0 1.946-1.37 3.68-3.348 3.97a48.901 48.901 0 0 1-3.476.383.39.39 0 0 0-.297.17l-2.755 4.133a.75.75 0 0 1-1.248 0l-2.755-4.133a.39.39 0 0 0-.297-.17 48.9 48.9 0 0 1-3.476-.384c-1.978-.29-3.348-2.024-3.348-3.97V6.741c0-1.946 1.37-3.68 3.348-3.97ZM6.75 8.25a.75.75 0 0 1 .75-.75h9a.75.75 0 0 1 0 1.5h-9a.75.75 0 0 1-.75-.75Zm.75 2.25a.75.75 0 0 0 0 1.5h5.25a.75.75 0 0 0 0-1.5H7.5Z" clipRule="evenodd" />
     </svg>
   );
 }
@@ -38,7 +45,7 @@ const BUTTON_CLASS = {
     'rounded-lg border-[0.7px] border-zinc-300 bg-white px-4 py-1.5 text-xs font-medium text-zinc-800 transition hover:bg-zinc-100 disabled:opacity-60 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-50 dark:hover:bg-zinc-800',
 };
 
-export type AppPageHeaderTab = 'edit' | 'settings' | 'analytics';
+export type AppPageHeaderTab = 'edit' | 'settings' | 'analytics' | 'testimonial';
 
 export type AppPageHeaderProps = {
   appID: string;
@@ -72,7 +79,8 @@ export function AppPageHeader({
   const tabs: { id: AppPageHeaderTab; href: string; label: string; Icon: React.ComponentType<{ className?: string }>; badge?: boolean }[] = [
     { id: 'edit', href: `${base}/edit`, label: 'エディター', Icon: PencilIcon, badge: editDirty },
     { id: 'settings', href: `${base}/settings`, label: '設定', Icon: GearIcon, badge: settingsUrlPending },
-    { id: 'analytics', href: `${base}/analytics`, label: 'アナリティクス', Icon: ChartIcon },
+    { id: 'testimonial', href: `${base}/testimonial`, label: 'ユーザーの声', Icon: ChatBubbleIcon },
+    { id: 'analytics', href: `${base}/analytics`, label: 'アナリティクス', Icon: EqualizerIcon },
   ];
 
   const currentTab = tabs.find((t) => pathname === t.href || pathname.startsWith(t.href + '/'))?.id ?? 'edit';
