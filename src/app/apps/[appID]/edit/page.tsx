@@ -8,7 +8,7 @@ import { AppPageHeader } from '@/components/AppPageHeader';
 import { ImageUploadInput } from '@/components/ImageUploadInput';
 import { Tooltip } from '@/components/Tooltip';
 import { useAppChanges } from '@/context/AppChangesContext';
-import { type AppFormState, type SectionId, defaultFormState, SECTIONS, type FeaturedItem } from '@/lib/app-edit-types';
+import { type AppFormState, type SectionId, defaultFormState, SECTIONS, type FeaturedItem, parseBmcButtonConfig, parseBmcScriptTag } from '@/lib/app-edit-types';
 
 const INPUT_CLASS =
   'w-full rounded-lg bg-zinc-100 px-3 py-2 text-sm text-zinc-900 outline-none transition placeholder:text-zinc-500 focus:bg-zinc-200 focus:ring-[0.7px] focus:ring-zinc-300 dark:bg-zinc-800 dark:text-zinc-50 dark:placeholder:text-zinc-400 dark:focus:bg-zinc-700 dark:focus:ring-zinc-600';
@@ -99,6 +99,7 @@ export default function StudioAppEditPage() {
   const [publishing, setPublishing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [initialized, setInitialized] = useState(false);
+  const [bmcInputMode, setBmcInputMode] = useState<'url' | 'code'>('url');
   const [dirty, setDirty] = useState(false);
   const [isPublished, setIsPublished] = useState(false);
   const appChanges = useAppChanges();
@@ -189,6 +190,7 @@ export default function StudioAppEditPage() {
       developer_contact_url: String(r.developer_contact_url ?? ''),
       support_visible: Boolean(r.support_visible),
       buy_me_a_coffee_url: String(r.buy_me_a_coffee_url ?? ''),
+      bmc_button_config: parseBmcButtonConfig(r.bmc_button_config),
       meta_title: String(r.meta_title ?? ''),
       meta_description: String(r.meta_description ?? ''),
       meta_cover_image_url: String(r.meta_cover_image_url ?? ''),
@@ -243,6 +245,7 @@ export default function StudioAppEditPage() {
       developer_contact_url: form.developer_contact_url.trim() || null,
       support_visible: form.support_visible,
       buy_me_a_coffee_url: form.buy_me_a_coffee_url.trim() || null,
+      bmc_button_config: form.bmc_button_config,
       meta_title: form.meta_title.trim() || null,
       meta_description: form.meta_description.trim() || null,
       meta_cover_image_url: form.meta_cover_image_url.trim() || null,
@@ -895,19 +898,75 @@ export default function StudioAppEditPage() {
               )}
 
               {focusedSection === 'support' && (
-                <div>
-                  <label className={LABEL_CLASS}>
-                    Buy Me A Coffee URL（寄付ボタン）
-                  </label>
-                  <input
-                    type="url"
-                    value={form.buy_me_a_coffee_url}
-                    onChange={(e) =>
-                      updateForm({ buy_me_a_coffee_url: e.target.value })
-                    }
-                    placeholder="https://buymeacoffee.com/..."
-                    className={INPUT_CLASS}
-                  />
+                <div className="space-y-4">
+                  <div className="flex rounded-lg bg-zinc-100 p-0.5 dark:bg-zinc-800">
+                    <button
+                      type="button"
+                      onClick={() => setBmcInputMode('url')}
+                      className={`flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition ${bmcInputMode === 'url' ? 'bg-white text-zinc-900 shadow-sm dark:bg-zinc-700 dark:text-zinc-50' : 'text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300'}`}
+                    >
+                      URL
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setBmcInputMode('code')}
+                      className={`flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition ${bmcInputMode === 'code' ? 'bg-white text-zinc-900 shadow-sm dark:bg-zinc-700 dark:text-zinc-50' : 'text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300'}`}
+                    >
+                      コード
+                    </button>
+                  </div>
+
+                  {bmcInputMode === 'url' && (
+                    <div>
+                      <label className={LABEL_CLASS}>
+                        Buy Me A Coffee URL
+                      </label>
+                      <input
+                        type="url"
+                        value={form.buy_me_a_coffee_url}
+                        onChange={(e) =>
+                          updateForm({ buy_me_a_coffee_url: e.target.value, bmc_button_config: null })
+                        }
+                        placeholder="https://buymeacoffee.com/yourname"
+                        className={INPUT_CLASS}
+                      />
+                    </div>
+                  )}
+
+                  {bmcInputMode === 'code' && (
+                    <div>
+                      <label className={LABEL_CLASS}>
+                        Buy Me A Coffee ボタンスクリプト
+                      </label>
+                      <textarea
+                        rows={3}
+                        className={INPUT_CLASS}
+                        placeholder={'<script type="text/javascript" src="https://cdnjs.buymeacoffee.com/..." data-slug="yourname" ...></script>'}
+                        onPaste={(e) => {
+                          const text = e.clipboardData.getData('text');
+                          const parsed = parseBmcScriptTag(text);
+                          if (parsed) {
+                            e.preventDefault();
+                            updateForm({
+                              bmc_button_config: parsed,
+                              buy_me_a_coffee_url: `https://buymeacoffee.com/${parsed.slug}`,
+                            });
+                          }
+                        }}
+                        onChange={(e) => {
+                          const parsed = parseBmcScriptTag(e.target.value);
+                          if (parsed) {
+                            updateForm({
+                              bmc_button_config: parsed,
+                              buy_me_a_coffee_url: `https://buymeacoffee.com/${parsed.slug}`,
+                            });
+                          }
+                        }}
+                        value={form.bmc_button_config ? `<script data-slug="${form.bmc_button_config.slug}" data-color="${form.bmc_button_config.color}" data-emoji="${form.bmc_button_config.emoji}" data-text="${form.bmc_button_config.text}" ...></script>` : ''}
+                      />
+                    </div>
+                  )}
+
                 </div>
               )}
               {focusedSection === 'footer' && null}
@@ -935,7 +994,12 @@ export default function StudioAppEditPage() {
           >
             <div className="mx-auto w-full max-w-2xl px-4 sm:px-8">
               <AppPageView
-                data={form}
+                data={{
+                  ...form,
+                  ...(bmcInputMode === 'url'
+                    ? { bmc_button_config: null }
+                    : { buy_me_a_coffee_url: form.bmc_button_config ? form.buy_me_a_coffee_url : '' }),
+                }}
                 preview
                 onSectionFocus={setFocusedSection}
                 focusedSectionId={focusedSection}

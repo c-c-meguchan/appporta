@@ -45,6 +45,63 @@ export type FeaturedItem = {
   image_url?: string;
 };
 
+export type BmcButtonConfig = {
+  slug: string;
+  color: string;
+  emoji: string;
+  font: string;
+  text: string;
+  outline_color: string;
+  font_color: string;
+  coffee_color: string;
+};
+
+export const defaultBmcButtonConfig: BmcButtonConfig = {
+  slug: '',
+  color: '#FFDD00',
+  emoji: '☕',
+  font: 'Lato',
+  text: 'Buy me a coffee',
+  outline_color: '#000000',
+  font_color: '#000000',
+  coffee_color: '#ffffff',
+};
+
+export function parseBmcButtonConfig(val: unknown): BmcButtonConfig | null {
+  if (!val || typeof val !== 'object') return null;
+  const o = val as Record<string, unknown>;
+  if (typeof o.slug !== 'string' || !o.slug) return null;
+  return {
+    slug: o.slug,
+    color: typeof o.color === 'string' ? o.color : defaultBmcButtonConfig.color,
+    emoji: typeof o.emoji === 'string' ? o.emoji : defaultBmcButtonConfig.emoji,
+    font: typeof o.font === 'string' ? o.font : defaultBmcButtonConfig.font,
+    text: typeof o.text === 'string' ? o.text : defaultBmcButtonConfig.text,
+    outline_color: typeof o.outline_color === 'string' ? o.outline_color : defaultBmcButtonConfig.outline_color,
+    font_color: typeof o.font_color === 'string' ? o.font_color : defaultBmcButtonConfig.font_color,
+    coffee_color: typeof o.coffee_color === 'string' ? o.coffee_color : defaultBmcButtonConfig.coffee_color,
+  };
+}
+
+export function parseBmcScriptTag(script: string): BmcButtonConfig | null {
+  const attr = (name: string): string => {
+    const m = script.match(new RegExp(`data-${name}="([^"]*)"`));
+    return m ? m[1] : '';
+  };
+  const slug = attr('slug');
+  if (!slug) return null;
+  return {
+    slug,
+    color: attr('color') || defaultBmcButtonConfig.color,
+    emoji: attr('emoji') || defaultBmcButtonConfig.emoji,
+    font: attr('font') || defaultBmcButtonConfig.font,
+    text: attr('text') || defaultBmcButtonConfig.text,
+    outline_color: attr('outline-color') || defaultBmcButtonConfig.outline_color,
+    font_color: attr('font-color') || defaultBmcButtonConfig.font_color,
+    coffee_color: attr('coffee-color') || defaultBmcButtonConfig.coffee_color,
+  };
+}
+
 export type AppFormState = {
   name: string;
   catch_copy: string;
@@ -82,6 +139,7 @@ export type AppFormState = {
   developer_contact_url: string;
   support_visible: boolean;
   buy_me_a_coffee_url: string;
+  bmc_button_config: BmcButtonConfig | null;
   meta_title: string;
   meta_description: string;
   meta_cover_image_url: string;
@@ -124,6 +182,7 @@ export const defaultFormState: AppFormState = {
   developer_contact_url: '',
   support_visible: false,
   buy_me_a_coffee_url: '',
+  bmc_button_config: null,
   meta_title: '',
   meta_description: '',
   meta_cover_image_url: '',

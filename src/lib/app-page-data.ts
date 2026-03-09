@@ -1,5 +1,5 @@
 import type { AppFormState, ReleaseNote, FeaturedItem } from '@/lib/app-edit-types';
-import { defaultFormState } from '@/lib/app-edit-types';
+import { defaultFormState, parseBmcButtonConfig } from '@/lib/app-edit-types';
 
 function parseJsonArray(val: unknown, fallback: any[]): any[] {
   if (Array.isArray(val)) return val;
@@ -75,6 +75,7 @@ export function appRowToFormState(r: Record<string, unknown>): AppFormState {
     developer_contact_url: String(r.developer_contact_url ?? ''),
     support_visible: Boolean(r.support_visible),
     buy_me_a_coffee_url: String(r.buy_me_a_coffee_url ?? ''),
+    bmc_button_config: parseBmcButtonConfig(r.bmc_button_config),
     meta_title: String(r.name ?? r.meta_title ?? ''),
     meta_description: String(r.catch_copy ?? r.meta_description ?? ''),
     meta_cover_image_url: String(r.icon_url ?? r.meta_cover_image_url ?? ''),
