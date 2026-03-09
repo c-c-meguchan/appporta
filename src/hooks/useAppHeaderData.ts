@@ -2,12 +2,11 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { getMainOriginClient } from '@/lib/constants';
 
 /** 設定・アナリティクス画面でヘッダー用のアプリ情報と公開/非公開ハンドラを取得 */
 export function useAppHeaderData(appID: string) {
   const [isPublished, setIsPublished] = useState(false);
-  const [publicPageUrl, setPublicPageUrl] = useState('');
+  const [pendingAppId, setPendingAppId] = useState<string | null>(null);
   const [publishing, setPublishing] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -15,7 +14,7 @@ export function useAppHeaderData(appID: string) {
     if (!appID) return;
     const { data, error } = await supabase
       .from('apps')
-      .select('is_published')
+      .select('is_published, pending_app_id')
       .eq('app_id', appID)
       .maybeSingle();
     if (error) {
@@ -23,7 +22,7 @@ export function useAppHeaderData(appID: string) {
       return;
     }
     setIsPublished(Boolean(data?.is_published));
-    setPublicPageUrl(`${getMainOriginClient()}/${appID}`);
+    setPendingAppId(data?.pending_app_id ?? null);
     setLoading(false);
   }, [appID]);
 
@@ -45,5 +44,5 @@ export function useAppHeaderData(appID: string) {
     setPublishing(false);
   }, [appID]);
 
-  return { isPublished, publicPageUrl, publishing, loading, onPublish, onUnpublish };
+  return { isPublished, pendingAppId, publishing, loading, onPublish, onUnpublish, refetch: fetchApp };
 }

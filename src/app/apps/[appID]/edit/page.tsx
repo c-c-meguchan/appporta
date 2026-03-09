@@ -7,8 +7,8 @@ import { AppPageView } from '@/components/app-page-view/AppPageView';
 import { AppPageHeader } from '@/components/AppPageHeader';
 import { ImageUploadInput } from '@/components/ImageUploadInput';
 import { Tooltip } from '@/components/Tooltip';
+import { useAppChanges } from '@/context/AppChangesContext';
 import { type AppFormState, type SectionId, defaultFormState, SECTIONS, type FeaturedItem } from '@/lib/app-edit-types';
-import { getMainOriginClient } from '@/lib/constants';
 
 const INPUT_CLASS =
   'w-full rounded-lg bg-zinc-100 px-3 py-2 text-sm text-zinc-900 outline-none transition placeholder:text-zinc-500 focus:bg-zinc-200 focus:ring-[0.7px] focus:ring-zinc-300 dark:bg-zinc-800 dark:text-zinc-50 dark:placeholder:text-zinc-400 dark:focus:bg-zinc-700 dark:focus:ring-zinc-600';
@@ -101,13 +101,11 @@ export default function StudioAppEditPage() {
   const [initialized, setInitialized] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [isPublished, setIsPublished] = useState(false);
-  const [publicPageUrl, setPublicPageUrl] = useState('');
+  const appChanges = useAppChanges();
 
   useEffect(() => {
-    if (typeof window !== 'undefined' && appID) {
-      setPublicPageUrl(`${getMainOriginClient()}/${appID}`);
-    }
-  }, [appID]);
+    if (dirty) appChanges?.setEditDirty(true);
+  }, [dirty, appChanges]);
 
   const updateForm = useCallback(
     (patch: Partial<AppFormState>) => {
@@ -270,6 +268,12 @@ export default function StudioAppEditPage() {
     return () => clearTimeout(timer);
   }, [initialized, dirty, handleSave]);
 
+  /** ヘッダー「更新」用: 保存してから公開反映済みとして editDirty をクリア */
+  const handleHeaderUpdate = useCallback(async () => {
+    await handleSave();
+    appChanges?.setEditDirty(false);
+  }, [handleSave, appChanges]);
+
   const handlePublish = useCallback(async () => {
     setPublishing(true);
     setError(null);
@@ -335,9 +339,9 @@ export default function StudioAppEditPage() {
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950">
       <AppPageHeader
         appID={appID}
-        publicPageUrl={publicPageUrl || undefined}
+
         isPublished={isPublished}
-        onSave={handleSave}
+        onSave={handleHeaderUpdate}
         onPublish={handlePublish}
         onUnpublish={handleUnpublish}
         saving={saving}

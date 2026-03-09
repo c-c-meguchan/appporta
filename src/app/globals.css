@@ -24,3 +24,33 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+@keyframes url-block-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes url-error-in {
+  from {
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-url-block-in {
+  animation: url-block-fade-in 0.2s ease-out forwards;
+}
+
+.animate-url-error-in {
+  animation: url-error-in 0.2s ease-out forwards;
+}

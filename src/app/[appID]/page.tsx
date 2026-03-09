@@ -1,6 +1,6 @@
 'use client';
 
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { notFound } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
@@ -12,6 +12,7 @@ import { isReservedAppId } from '@/lib/constants';
 
 export default function PublicAppPage() {
   const params = useParams();
+  const router = useRouter();
   const appID = typeof params.appID === 'string' ? params.appID : '';
 
   const [data, setData] = useState<AppFormState | null>(null);
@@ -43,6 +44,18 @@ export default function PublicAppPage() {
       return;
     }
     if (!appData) {
+      // アプリが存在しない場合、旧URL→新URLのリダイレクトを確認（30日間・直前のみ）
+      const { data: redirectRow } = await supabase
+        .from('url_redirects')
+        .select('to_app_id')
+        .eq('from_app_id', appID)
+        .gt('expires_at', new Date().toISOString())
+        .maybeSingle();
+      if (redirectRow?.to_app_id) {
+        setLoading(false);
+        router.replace(`/${redirectRow.to_app_id}`);
+        return;
+      }
       setNotPublished(true);
       setLoading(false);
       return;

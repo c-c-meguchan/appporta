@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { getMainOriginClient } from '@/lib/constants';
+import { useAppChanges } from '@/context/AppChangesContext';
 
 function PencilIcon({ className }: { className?: string }) {
   return (
@@ -41,7 +42,6 @@ export type AppPageHeaderTab = 'edit' | 'settings' | 'analytics';
 
 export type AppPageHeaderProps = {
   appID: string;
-  publicPageUrl?: string;
   isPublished: boolean;
   onSave?: () => void | Promise<void>;
   onPublish?: () => void | Promise<void>;
@@ -52,7 +52,6 @@ export type AppPageHeaderProps = {
 
 export function AppPageHeader({
   appID,
-  publicPageUrl,
   isPublished,
   onSave,
   onPublish,
@@ -61,16 +60,38 @@ export function AppPageHeader({
   publishing = false,
 }: AppPageHeaderProps) {
   const pathname = usePathname();
-  const base = `/apps/${appID}`;
-  const publicUrl = publicPageUrl ?? `${getMainOriginClient()}/${appID}`;
+  const changes = useAppChanges();
+  const editDirty = changes?.editDirty ?? false;
+  const settingsUrlPending = changes?.settingsUrlPending ?? false;
+  const hasAnyPending = editDirty || settingsUrlPending;
 
-  const tabs: { id: AppPageHeaderTab; href: string; label: string; Icon: React.ComponentType<{ className?: string }> }[] = [
-    { id: 'edit', href: `${base}/edit`, label: 'エディター', Icon: PencilIcon },
-    { id: 'settings', href: `${base}/settings`, label: '設定', Icon: GearIcon },
+  const base = `/apps/${appID}`;
+  // 常に現在のルート appID で公開URLを組み立て、リダイレクト後も即反映
+  const publicUrl = `${getMainOriginClient()}/${appID}`;
+
+  const tabs: { id: AppPageHeaderTab; href: string; label: string; Icon: React.ComponentType<{ className?: string }>; badge?: boolean }[] = [
+    { id: 'edit', href: `${base}/edit`, label: 'エディター', Icon: PencilIcon, badge: editDirty },
+    { id: 'settings', href: `${base}/settings`, label: '設定', Icon: GearIcon, badge: settingsUrlPending },
     { id: 'analytics', href: `${base}/analytics`, label: 'アナリティクス', Icon: ChartIcon },
   ];
 
   const currentTab = tabs.find((t) => pathname === t.href || pathname.startsWith(t.href + '/'))?.id ?? 'edit';
+
+  const handleUpdateClick = () => {
+    if (settingsUrlPending) {
+      changes?.setShowUrlConfirm(true);
+      return;
+    }
+    if (onSave) {
+      void onSave();
+      return;
+    }
+    if (editDirty) {
+      changes?.setEditDirty(false);
+    }
+  };
+
+  const isUpdating = saving || publishing;
 
   const renderActions = () => {
     if (isPublished) {
@@ -78,12 +99,12 @@ export function AppPageHeader({
         <>
           <button
             type="button"
-            onClick={onSave}
-            disabled={onSave == null || saving || publishing}
+            onClick={handleUpdateClick}
+            disabled={!hasAnyPending || isUpdating}
             className={BUTTON_CLASS.primary}
-            title={onSave == null ? '更新はエディターで行えます' : undefined}
+            title={!hasAnyPending ? '変更があると更新できます' : undefined}
           >
-            {saving ? '更新中...' : '更新'}
+            {isUpdating ? '更新中...' : '更新'}
           </button>
           {onUnpublish != null && (
             <button
@@ -96,6 +117,18 @@ export function AppPageHeader({
             </button>
           )}
         </>
+      );
+    }
+    if (hasAnyPending || onSave != null) {
+      return (
+        <button
+          type="button"
+          onClick={handleUpdateClick}
+          disabled={(!hasAnyPending && onSave == null) || isUpdating}
+          className={BUTTON_CLASS.primary}
+        >
+          {isUpdating ? '更新中...' : '更新'}
+        </button>
       );
     }
     if (onPublish != null) {
@@ -134,7 +167,7 @@ export function AppPageHeader({
           </Link>
         </div>
         <nav className="flex shrink-0 items-center gap-0.5" aria-label="アプリメニュー">
-          {tabs.map(({ id, href, label, Icon }) => {
+          {tabs.map(({ id, href, label, Icon, badge }) => {
             const isActive = currentTab === id;
             return (
               <Link
@@ -149,6 +182,13 @@ export function AppPageHeader({
               >
                 <Icon className="h-4 w-4 shrink-0" />
                 <span className="hidden sm:inline">{label}</span>
+                {badge && (
+                  <span
+                    className="h-2 w-2 shrink-0 rounded-full bg-orange-500 dark:bg-orange-400"
+                    title="未反映の変更あり"
+                    aria-hidden
+                  />
+                )}
               </Link>
             );
           })}
