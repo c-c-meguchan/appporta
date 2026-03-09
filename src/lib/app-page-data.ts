@@ -19,6 +19,7 @@ function parseReleaseNotes(val: unknown): ReleaseNote[] {
   return a.map((x: any) => ({
     version: typeof x?.version === 'string' ? x.version : '',
     body: typeof x?.body === 'string' ? x.body : '',
+    date: typeof x?.date === 'string' ? x.date : undefined,
   }));
 }
 

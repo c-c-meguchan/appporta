@@ -1,14 +1,14 @@
 'use client';
 
 import { useParams, useRouter } from 'next/navigation';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { AppPageView } from '@/components/app-page-view/AppPageView';
+import { AppPageView, type ReviewItem } from '@/components/app-page-view/AppPageView';
 import { AppPageHeader } from '@/components/AppPageHeader';
 import { ImageUploadInput } from '@/components/ImageUploadInput';
 import { Tooltip } from '@/components/Tooltip';
 import { useAppChanges } from '@/context/AppChangesContext';
-import { type AppFormState, type SectionId, defaultFormState, SECTIONS, type FeaturedItem, parseBmcButtonConfig, parseBmcScriptTag } from '@/lib/app-edit-types';
+import { type AppFormState, type ReleaseNote, type SectionId, defaultFormState, SECTIONS, type FeaturedItem, parseBmcButtonConfig, parseBmcScriptTag } from '@/lib/app-edit-types';
 
 const INPUT_CLASS =
   'w-full rounded-lg bg-zinc-100 px-3 py-2 text-sm text-zinc-900 outline-none transition placeholder:text-zinc-500 focus:bg-zinc-200 focus:ring-[0.7px] focus:ring-zinc-300 dark:bg-zinc-800 dark:text-zinc-50 dark:placeholder:text-zinc-400 dark:focus:bg-zinc-700 dark:focus:ring-zinc-600';
@@ -52,11 +52,12 @@ function parseJsonArray(val: unknown, fallback: any[]): any[] {
   return fallback;
 }
 
-function parseReleaseNotes(val: unknown): { version: string; body: string }[] {
+function parseReleaseNotes(val: unknown): ReleaseNote[] {
   const a = parseJsonArray(val, []);
   return a.map((x: any) => ({
     version: typeof x?.version === 'string' ? x.version : '',
     body: typeof x?.body === 'string' ? x.body : '',
+    date: typeof x?.date === 'string' ? x.date : undefined,
   }));
 }
 
@@ -102,6 +103,7 @@ export default function StudioAppEditPage() {
   const [bmcInputMode, setBmcInputMode] = useState<'url' | 'code'>('url');
   const [dirty, setDirty] = useState(false);
   const [isPublished, setIsPublished] = useState(false);
+  const [allReviews, setAllReviews] = useState<(ReviewItem & { is_public: boolean })[]>([]);
   const appChanges = useAppChanges();
 
   useEffect(() => {
@@ -203,6 +205,37 @@ export default function StudioAppEditPage() {
   useEffect(() => {
     fetchApp();
   }, [fetchApp]);
+
+  useEffect(() => {
+    if (!appID) return;
+    (async () => {
+      const { data } = await supabase
+        .from('reviews')
+        .select('id, user_icon_url, user_name, content, is_public, created_at')
+        .eq('app_id', appID)
+        .order('created_at', { ascending: false });
+      if (data) {
+        setAllReviews(
+          data.map((r) => ({
+            id: r.id,
+            user_icon_url: r.user_icon_url ?? null,
+            user_name: r.user_name ?? '',
+            content: r.content ?? '',
+            created_at: r.created_at,
+            is_public: Boolean(r.is_public),
+          })),
+        );
+      }
+    })();
+  }, [appID]);
+
+  const pendingChanges = appChanges?.pendingTestimonialChanges ?? new Map<string, boolean>();
+  const previewReviews: ReviewItem[] = useMemo(() => {
+    return allReviews.filter((r) => {
+      const effective = pendingChanges.has(r.id!) ? pendingChanges.get(r.id!)! : r.is_public;
+      return effective;
+    });
+  }, [allReviews, pendingChanges]);
 
   const handleSave = useCallback(async () => {
     setSaving(true);
@@ -612,44 +645,73 @@ export default function StudioAppEditPage() {
                     />
                   </div>
                   <div>
-                    <label className={LABEL_CLASS}>リリースノート</label>
+                    <div className="mb-2 flex items-baseline justify-between">
+                      <label className={`${LABEL_CLASS} mb-0`}>リリースノート</label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const today = new Date().toISOString().slice(0, 10);
+                          updateForm({
+                            release_notes: [{ version: '', body: '', date: today }, ...form.release_notes],
+                          });
+                        }}
+                        className="inline-flex items-center gap-1 rounded-md border border-zinc-300 px-1.5 py-px text-xs font-medium leading-tight text-zinc-600 transition hover:bg-zinc-100 dark:border-zinc-600 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M12 5v14M5 12h14"/></svg>
+                        追加
+                      </button>
+                    </div>
+                    <div className="space-y-2">
                     {form.release_notes.map((note, i) => (
-                      <div key={i} className="mb-2 flex gap-2">
-                        <input
-                          type="text"
-                          value={note.version}
-                          onChange={(e) => {
-                            const next = [...form.release_notes];
-                            next[i] = { ...next[i], version: e.target.value };
+                      <div key={i} className="group relative space-y-1 rounded-lg border border-zinc-200 p-3 dark:border-zinc-700">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const next = form.release_notes.filter((_, idx) => idx !== i);
                             updateForm({ release_notes: next });
                           }}
-                          placeholder="バージョン"
-                          className={INPUT_CLASS}
-                        />
-                        <input
-                          type="text"
+                          className="absolute -right-2 -top-2 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-zinc-200 text-zinc-500 opacity-0 transition hover:bg-red-500 hover:text-white group-hover:opacity-100 dark:bg-zinc-600 dark:text-zinc-300 dark:hover:bg-red-500 dark:hover:text-white"
+                          aria-label="削除"
+                        >
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M18 6 6 18M6 6l12 12"/></svg>
+                        </button>
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={note.version}
+                            onChange={(e) => {
+                              const next = [...form.release_notes];
+                              next[i] = { ...next[i], version: e.target.value };
+                              updateForm({ release_notes: next });
+                            }}
+                            placeholder="バージョン"
+                            className={INPUT_CLASS}
+                          />
+                          <input
+                            type="date"
+                            value={note.date ?? ''}
+                            onChange={(e) => {
+                              const next = [...form.release_notes];
+                              next[i] = { ...next[i], date: e.target.value };
+                              updateForm({ release_notes: next });
+                            }}
+                            className={`${INPUT_CLASS} dark:[color-scheme:dark]`}
+                          />
+                        </div>
+                        <textarea
                           value={note.body}
                           onChange={(e) => {
                             const next = [...form.release_notes];
                             next[i] = { ...next[i], body: e.target.value };
                             updateForm({ release_notes: next });
                           }}
-                          placeholder="内容"
+                          placeholder="内容（Markdown対応）"
+                          rows={3}
                           className={INPUT_CLASS}
                         />
                       </div>
                     ))}
-                    <button
-                      type="button"
-                      onClick={() =>
-                        updateForm({
-                          release_notes: [...form.release_notes, { version: '', body: '' }],
-                        })
-                      }
-                      className="text-sm text-zinc-600 underline dark:text-zinc-400"
-                    >
-                      + リリースノートを追加
-                    </button>
+                    </div>
                   </div>
                 </>
               )}
@@ -1000,6 +1062,7 @@ export default function StudioAppEditPage() {
                     ? { bmc_button_config: null }
                     : { buy_me_a_coffee_url: form.bmc_button_config ? form.buy_me_a_coffee_url : '' }),
                 }}
+                reviews={previewReviews}
                 preview
                 onSectionFocus={setFocusedSection}
                 focusedSectionId={focusedSection}

@@ -36,7 +36,7 @@ export const SECTIONS: SectionConfig[] = [
   { id: 'footer', name: 'Footer', nameJa: 'フッター', necessary: 'required' },
 ];
 
-export type ReleaseNote = { version: string; body: string };
+export type ReleaseNote = { version: string; body: string; date?: string };
 export type FeaturedItem = {
   url: string;
   note: string;
