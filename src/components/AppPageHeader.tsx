@@ -45,7 +45,7 @@ const BUTTON_CLASS = {
     'rounded-lg border-[0.7px] border-zinc-300 bg-white px-4 py-1.5 text-xs font-medium text-zinc-800 transition hover:bg-zinc-100 disabled:opacity-60 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-50 dark:hover:bg-zinc-800',
 };
 
-export type AppPageHeaderTab = 'edit' | 'settings' | 'analytics' | 'testimonial';
+export type AppPageHeaderTab = 'edit' | 'settings' | 'analytics' | 'testimonials';
 
 export type AppPageHeaderProps = {
   appID: string;
@@ -70,7 +70,8 @@ export function AppPageHeader({
   const changes = useAppChanges();
   const editDirty = changes?.editDirty ?? false;
   const settingsUrlPending = changes?.settingsUrlPending ?? false;
-  const hasAnyPending = editDirty || settingsUrlPending;
+  const testimonialsDirty = changes?.testimonialsDirty ?? false;
+  const hasAnyPending = editDirty || settingsUrlPending || testimonialsDirty;
 
   const base = `/apps/${appID}`;
   // 常に現在のルート appID で公開URLを組み立て、リダイレクト後も即反映
@@ -79,20 +80,22 @@ export function AppPageHeader({
   const tabs: { id: AppPageHeaderTab; href: string; label: string; Icon: React.ComponentType<{ className?: string }>; badge?: boolean }[] = [
     { id: 'edit', href: `${base}/edit`, label: 'エディター', Icon: PencilIcon, badge: editDirty },
     { id: 'settings', href: `${base}/settings`, label: '設定', Icon: GearIcon, badge: settingsUrlPending },
-    { id: 'testimonial', href: `${base}/testimonial`, label: 'ユーザーの声', Icon: ChatBubbleIcon },
+    { id: 'testimonials', href: `${base}/testimonials`, label: 'ユーザーの声', Icon: ChatBubbleIcon, badge: testimonialsDirty },
     { id: 'analytics', href: `${base}/analytics`, label: 'アナリティクス', Icon: EqualizerIcon },
   ];
 
   const currentTab = tabs.find((t) => pathname === t.href || pathname.startsWith(t.href + '/'))?.id ?? 'edit';
 
-  const handleUpdateClick = () => {
+  const handleUpdateClick = async () => {
     if (settingsUrlPending) {
       changes?.setShowUrlConfirm(true);
       return;
     }
     if (onSave) {
       void onSave();
-      return;
+    }
+    if (testimonialsDirty) {
+      await changes?.applyTestimonialChanges();
     }
     if (editDirty) {
       changes?.setEditDirty(false);

@@ -67,6 +67,7 @@ export default function PublicAppPage() {
       .from('reviews')
       .select('id, user_icon_url, user_name, content, created_at')
       .eq('app_id', appID)
+      .eq('is_public', true)
       .order('created_at', { ascending: false });
 
     if (reviewsData && Array.isArray(reviewsData)) {
@@ -107,5 +108,11 @@ export default function PublicAppPage() {
     );
   }
 
-  return <AppPageView data={data} reviews={reviews} />;
+  return (
+    <AppPageView
+      data={data}
+      reviews={reviews}
+      appID={appID}
+    />
+  );
 }

@@ -1,7 +1,12 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import type { AppFormState, SectionId } from '@/lib/app-edit-types';
+
+const REMARK_PLUGINS = [remarkGfm];
+import { TestimonialFormModal } from './TestimonialFormModal';
 
 export type ReviewItem = {
   id?: string;
@@ -20,6 +25,9 @@ type AppPageViewProps = {
   onSectionFocus?: (sectionId: SectionId) => void;
   /** 現在編集パネルでフォーカス中のセクションID（プレビューでハイライトに使用） */
   focusedSectionId?: SectionId | null;
+  /** 公開ページでの投稿フォーム用 */
+  appID?: string;
+  onReviewSubmitted?: (review: ReviewItem) => void;
 };
 
 function useHorizontalFade() {
@@ -163,10 +171,13 @@ function SectionWrapper({
   );
 }
 
-export function AppPageView({ data: d, reviews = [], preview, onSectionFocus, focusedSectionId }: AppPageViewProps) {
+export function AppPageView({ data: d, reviews = [], preview, onSectionFocus, focusedSectionId, appID, onReviewSubmitted }: AppPageViewProps) {
   const embedUrl = embedVideoUrl(ensureAbsoluteUrl(d.video_url));
   const galleryUrls = d.gallery_image_urls.filter(Boolean);
   const { ref: galleryScrollRef, atStart: galleryAtStart, atEnd: galleryAtEnd } = useHorizontalFade();
+  const { ref: reviewsScrollRef, atStart: reviewsAtStart, atEnd: reviewsAtEnd } = useHorizontalFade();
+  const [showTestimonialForm, setShowTestimonialForm] = useState(false);
+  const [expandedReview, setExpandedReview] = useState<ReviewItem | null>(null);
 
   return (
     <div className="min-h-screen bg-white text-zinc-900 dark:bg-zinc-950 dark:text-zinc-50">
@@ -276,11 +287,18 @@ export function AppPageView({ data: d, reviews = [], preview, onSectionFocus, fo
                 <summary className="cursor-pointer text-sm text-zinc-600 dark:text-zinc-400">
                   リリースノート
                 </summary>
-                <ul className="mt-2 space-y-2 pl-4">
+                <ul className="mt-2 space-y-3 pl-4">
                   {d.release_notes.map((note, i) => (
                     <li key={i} className="text-sm">
-                      <span className="font-medium">{note.version}</span>
-                      {note.body && <span className="text-zinc-600 dark:text-zinc-400"> — {note.body}</span>}
+                      <div className="flex items-baseline justify-between">
+                        <span className="text-base font-bold">{note.version}</span>
+                        {note.date && <span className="text-xs text-zinc-400 dark:text-zinc-500">{note.date}</span>}
+                      </div>
+                      {note.body && (
+                        <div className="mt-1 prose prose-sm prose-zinc dark:prose-invert max-w-none">
+                          <ReactMarkdown remarkPlugins={REMARK_PLUGINS}>{note.body}</ReactMarkdown>
+                        </div>
+                      )}
                     </li>
                   ))}
                 </ul>
@@ -399,52 +417,134 @@ export function AppPageView({ data: d, reviews = [], preview, onSectionFocus, fo
             className="-mx-2 px-2"
           >
           <section className="py-6 border-t-[0.7px] border-zinc-200 dark:border-zinc-800">
-            <h2 className="text-lg font-semibold">ユーザーの声</h2>
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold">ユーザーの声</h2>
+              {d.users_voice_show_post_button && (
+                <button
+                  type="button"
+                  onClick={!preview && appID ? () => setShowTestimonialForm(true) : undefined}
+                  className="flex items-center gap-1 rounded-lg border-[0.7px] border-zinc-300 px-3 py-1.5 text-sm font-medium hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
+                    <path d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" />
+                  </svg>
+                  投稿する
+                </button>
+              )}
+            </div>
             {reviews.length > 0 ? (
-              <div className="mt-3 flex gap-4 overflow-x-auto pb-2">
-                {reviews.map((r, i) => (
-                  <div
-                    key={r.id ?? i}
-                    className="w-64 flex-shrink-0 rounded-xl border-[0.7px] border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900"
-                  >
-                    <div className="flex items-center gap-2">
-                      {r.user_icon_url ? (
-                        <div className="h-8 w-8 overflow-hidden rounded-full">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={r.user_icon_url}
-                            alt=""
-                            className="h-full w-full object-cover"
-                          />
-                        </div>
-                      ) : (
-                        <div className="h-8 w-8 rounded-full bg-zinc-300 dark:bg-zinc-600" />
-                      )}
-                      <span className="text-sm font-medium">{r.user_name}</span>
-                    </div>
-                    <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400 line-clamp-3">
-                      {r.content}
-                    </p>
-                    {r.created_at && (
-                      <p className="mt-2 text-xs text-zinc-400 dark:text-zinc-500">
-                        {new Date(r.created_at).toLocaleDateString('ja-JP')}
-                      </p>
-                    )}
-                  </div>
-                ))}
+              <div className="relative mt-4">
+                <div ref={reviewsScrollRef} className="flex gap-4 overflow-x-auto pb-2">
+                  {reviews.map((r, i) => (
+                    <button
+                      type="button"
+                      key={r.id ?? i}
+                      onClick={() => setExpandedReview(r)}
+                      className="w-72 flex-shrink-0 rounded-2xl border-[0.7px] border-zinc-200 bg-white px-5 py-8 text-left transition hover:border-zinc-300 hover:shadow-sm dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-700"
+                    >
+                      <div className="flex flex-col items-center text-center">
+                        {r.user_icon_url ? (
+                          <div className="h-14 w-14 overflow-hidden rounded-full">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={r.user_icon_url}
+                              alt=""
+                              className="h-full w-full object-cover"
+                            />
+                          </div>
+                        ) : (
+                          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-zinc-200 dark:bg-zinc-700">
+                            <span className="text-lg font-medium text-zinc-400 dark:text-zinc-500">
+                              {r.user_name.charAt(0)}
+                            </span>
+                          </div>
+                        )}
+                        <span className="mt-2 text-sm font-bold text-zinc-900 dark:text-zinc-50">
+                          {r.user_name}
+                        </span>
+                        {r.content && (
+                          <p className="mt-2 text-sm leading-relaxed text-zinc-900 dark:text-zinc-100 line-clamp-4">
+                            {r.content}
+                          </p>
+                        )}
+                        {r.created_at && (
+                          <p className="mt-3 text-xs text-zinc-400 dark:text-zinc-500">
+                            {new Date(r.created_at).toLocaleDateString('ja-JP')}
+                          </p>
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+                <div
+                  className={`pointer-events-none absolute inset-y-0 left-0 w-6 bg-gradient-to-r from-white dark:from-zinc-950 to-transparent transition-opacity ${
+                    reviewsAtStart ? 'opacity-0' : 'opacity-100'
+                  }`}
+                />
+                <div
+                  className={`pointer-events-none absolute inset-y-0 right-0 w-6 bg-gradient-to-l from-white dark:from-zinc-950 to-transparent transition-opacity ${
+                    reviewsAtEnd ? 'opacity-0' : 'opacity-100'
+                  }`}
+                />
               </div>
             ) : (
               <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
                 まだレビューはありません。
               </p>
             )}
-            {d.users_voice_show_post_button && (
-              <button
-                type="button"
-                className="mt-4 rounded-lg border-[0.7px] border-zinc-300 px-4 py-2 text-sm font-medium hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
-              >
-                ユーザーの声を投稿
-              </button>
+            {!preview && appID && (
+              <TestimonialFormModal
+                appID={appID}
+                open={showTestimonialForm}
+                onClose={() => setShowTestimonialForm(false)}
+                onSubmitted={onReviewSubmitted}
+              />
+            )}
+            {expandedReview && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setExpandedReview(null)}>
+                <div
+                  className="relative mx-4 w-full max-w-md rounded-2xl border-[0.7px] border-zinc-200 bg-white p-6 shadow-xl dark:border-zinc-700 dark:bg-zinc-900"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <button
+                    type="button"
+                    onClick={() => setExpandedReview(null)}
+                    className="absolute right-3 top-3 rounded-lg p-1.5 text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+                    aria-label="閉じる"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-5 w-5">
+                      <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
+                    </svg>
+                  </button>
+                  <div className="flex flex-col items-center text-center">
+                    {expandedReview.user_icon_url ? (
+                      <div className="h-16 w-16 overflow-hidden rounded-full">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={expandedReview.user_icon_url} alt="" className="h-full w-full object-cover" />
+                      </div>
+                    ) : (
+                      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-zinc-200 dark:bg-zinc-700">
+                        <span className="text-xl font-medium text-zinc-400 dark:text-zinc-500">
+                          {expandedReview.user_name.charAt(0)}
+                        </span>
+                      </div>
+                    )}
+                    <span className="mt-3 text-base font-bold text-zinc-900 dark:text-zinc-50">
+                      {expandedReview.user_name}
+                    </span>
+                    {expandedReview.content && (
+                      <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-zinc-900 dark:text-zinc-100">
+                        {expandedReview.content}
+                      </p>
+                    )}
+                    {expandedReview.created_at && (
+                      <p className="mt-4 text-xs text-zinc-400 dark:text-zinc-500">
+                        {new Date(expandedReview.created_at).toLocaleDateString('ja-JP')}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
             )}
           </section>
           </SectionWrapper>
@@ -610,7 +710,7 @@ export function AppPageView({ data: d, reviews = [], preview, onSectionFocus, fo
         </SectionWrapper>
 
         {/* Support */}
-        {d.support_visible && d.buy_me_a_coffee_url && (
+        {d.support_visible && (d.bmc_button_config || d.buy_me_a_coffee_url) && (
           <SectionWrapper
             sectionId="support"
             preview={preview}
@@ -622,24 +722,37 @@ export function AppPageView({ data: d, reviews = [], preview, onSectionFocus, fo
             <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
               この開発者を支援する
             </h2>
-            <a
-              href={ensureAbsoluteUrl(d.buy_me_a_coffee_url)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-3 inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold text-black transition hover:opacity-90"
-              style={{ backgroundColor: 'rgb(248, 218, 57)' }}
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                fill="currentColor"
-                className="h-5 w-5 shrink-0 text-black"
-                aria-hidden
+            {d.bmc_button_config ? (
+              <a
+                href={`https://buymeacoffee.com/${d.bmc_button_config.slug}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-3 inline-flex items-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold transition hover:opacity-90"
+                style={{
+                  backgroundColor: d.bmc_button_config.color,
+                  color: d.bmc_button_config.font_color,
+                  border: `1px solid ${d.bmc_button_config.outline_color}`,
+                  fontFamily: d.bmc_button_config.font,
+                }}
               >
-                <path d="M20 3H4v10c0 2.21 1.79 4 4 4h6c2.21 0 4-1.79 4-4v-3h2c1.11 0 2-.89 2-2V5c0-1.11-.89-2-2-2zm0 5h-2V5h2v3zM4 19h16v2H4z" />
-              </svg>
-              Buy Me A Coffee
-            </a>
+                <span className="text-lg leading-none" aria-hidden>{d.bmc_button_config.emoji}</span>
+                {d.bmc_button_config.text}
+              </a>
+            ) : (
+              <a
+                href={ensureAbsoluteUrl(d.buy_me_a_coffee_url)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-3 inline-block transition hover:opacity-90"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="/buy_me_a_coffee/bmc-button.svg"
+                  alt="Buy Me A Coffee"
+                  className="h-10"
+                />
+              </a>
+            )}
           </section>
           </SectionWrapper>
         )}

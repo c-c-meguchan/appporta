@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { useAppHeaderData } from '@/hooks/useAppHeaderData';
 
+type TestimonialChange = { id: string; is_public: boolean };
+
 type AppChangesContextValue = {
   editDirty: boolean;
   setEditDirty: (v: boolean) => void;
@@ -16,6 +18,11 @@ type AppChangesContextValue = {
   setShowUrlConfirm: (v: boolean) => void;
   applyUrlChange: () => Promise<boolean>;
   applyingUrl: boolean;
+  testimonialsDirty: boolean;
+  pendingTestimonialChanges: Map<string, boolean>;
+  stageTestimonialChange: (id: string, is_public: boolean) => void;
+  applyTestimonialChanges: () => Promise<void>;
+  clearTestimonialChanges: () => void;
 };
 
 const AppChangesContext = createContext<AppChangesContextValue | null>(null);
@@ -39,6 +46,8 @@ export function AppChangesProvider({ appID, children }: AppChangesProviderProps)
   const [pendingAppId, setPendingAppId] = useState<string | null>(null);
   const [showUrlConfirm, setShowUrlConfirm] = useState(false);
   const [applyingUrl, setApplyingUrl] = useState(false);
+  const [pendingTestimonialChanges, setPendingTestimonialChanges] = useState<Map<string, boolean>>(new Map());
+  const testimonialsDirty = pendingTestimonialChanges.size > 0;
 
   useEffect(() => {
     setPendingAppId(serverPending ?? null);
@@ -103,6 +112,29 @@ export function AppChangesProvider({ appID, children }: AppChangesProviderProps)
     }
   }, [appID, pendingAppId, router]);
 
+  const stageTestimonialChange = useCallback((id: string, is_public: boolean) => {
+    setPendingTestimonialChanges((prev) => {
+      const next = new Map(prev);
+      next.set(id, is_public);
+      return next;
+    });
+  }, []);
+
+  const applyTestimonialChanges = useCallback(async () => {
+    const entries = Array.from(pendingTestimonialChanges.entries());
+    if (entries.length === 0) return;
+
+    const promises = entries.map(([id, is_public]) =>
+      supabase.from('reviews').update({ is_public }).eq('id', id),
+    );
+    await Promise.all(promises);
+    setPendingTestimonialChanges(new Map());
+  }, [pendingTestimonialChanges]);
+
+  const clearTestimonialChanges = useCallback(() => {
+    setPendingTestimonialChanges(new Map());
+  }, []);
+
   const value: AppChangesContextValue = {
     editDirty,
     setEditDirty,
@@ -114,6 +146,11 @@ export function AppChangesProvider({ appID, children }: AppChangesProviderProps)
     setShowUrlConfirm,
     applyUrlChange,
     applyingUrl,
+    testimonialsDirty,
+    pendingTestimonialChanges,
+    stageTestimonialChange,
+    applyTestimonialChanges,
+    clearTestimonialChanges,
   };
 
   return (
