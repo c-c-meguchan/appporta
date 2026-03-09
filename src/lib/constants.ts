@@ -24,6 +24,7 @@ export const RESERVED_APP_IDS = new Set([
   'security',
   'legal',
   'news',
+  'pickup',
 ]);
 
 export function isReservedAppId(value: string): boolean {
