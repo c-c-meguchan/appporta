@@ -197,6 +197,9 @@ export default function StudioAppEditPage() {
       meta_description: String(r.meta_description ?? ''),
       meta_cover_image_url: String(r.meta_cover_image_url ?? ''),
     });
+    if (parseBmcButtonConfig(r.bmc_button_config)) {
+      setBmcInputMode('code');
+    }
     setIsPublished(Boolean(r.is_published));
     setInitialized(true);
     setLoading(false);
@@ -277,8 +280,8 @@ export default function StudioAppEditPage() {
       developer_x: form.developer_x.trim() || null,
       developer_contact_url: form.developer_contact_url.trim() || null,
       support_visible: form.support_visible,
-      buy_me_a_coffee_url: form.buy_me_a_coffee_url.trim() || null,
-      bmc_button_config: form.bmc_button_config,
+      buy_me_a_coffee_url: bmcInputMode === 'url' ? (form.buy_me_a_coffee_url.trim() || null) : null,
+      bmc_button_config: bmcInputMode === 'code' ? form.bmc_button_config : null,
       meta_title: form.meta_title.trim() || null,
       meta_description: form.meta_description.trim() || null,
       meta_cover_image_url: form.meta_cover_image_url.trim() || null,
@@ -292,7 +295,7 @@ export default function StudioAppEditPage() {
       setError('保存に失敗しました。');
     }
     setSaving(false);
-  }, [appID, form]);
+  }, [appID, form, bmcInputMode]);
 
   // 自動保存（初期ロード後の変更のみ）
   useEffect(() => {
@@ -964,14 +967,14 @@ export default function StudioAppEditPage() {
                   <div className="flex rounded-lg bg-zinc-100 p-0.5 dark:bg-zinc-800">
                     <button
                       type="button"
-                      onClick={() => setBmcInputMode('url')}
+                      onClick={() => { setBmcInputMode('url'); setDirty(true); }}
                       className={`flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition ${bmcInputMode === 'url' ? 'bg-white text-zinc-900 shadow-sm dark:bg-zinc-700 dark:text-zinc-50' : 'text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300'}`}
                     >
                       URL
                     </button>
                     <button
                       type="button"
-                      onClick={() => setBmcInputMode('code')}
+                      onClick={() => { setBmcInputMode('code'); setDirty(true); }}
                       className={`flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition ${bmcInputMode === 'code' ? 'bg-white text-zinc-900 shadow-sm dark:bg-zinc-700 dark:text-zinc-50' : 'text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300'}`}
                     >
                       コード
