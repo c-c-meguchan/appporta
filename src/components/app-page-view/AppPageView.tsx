@@ -6,6 +6,16 @@ import remarkGfm from 'remark-gfm';
 import type { AppFormState, SectionId } from '@/lib/app-edit-types';
 
 const REMARK_PLUGINS = [remarkGfm];
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+const MARKDOWN_COMPONENTS = {
+  th: ({ node, style, children, ...props }: any) => (
+    <th {...props} style={{ ...style, fontWeight: 'normal' }}>{children}</th>
+  ),
+  td: ({ node, style, children, ...props }: any) => (
+    <td {...props} style={{ ...style, fontWeight: 'normal' }}>{children}</td>
+  ),
+};
 import { TestimonialFormModal } from './TestimonialFormModal';
 
 export type ReviewItem = {
@@ -25,6 +35,10 @@ type AppPageViewProps = {
   onSectionFocus?: (sectionId: SectionId) => void;
   /** 現在編集パネルでフォーカス中のセクションID（プレビューでハイライトに使用） */
   focusedSectionId?: SectionId | null;
+  /** セクションホバー時のコールバック */
+  onSectionHover?: (sectionId: SectionId | null) => void;
+  /** 外部からのホバー中セクションID */
+  hoveredSectionId?: SectionId | null;
   /** 公開ページでの投稿フォーム用 */
   appID?: string;
 };
@@ -134,6 +148,8 @@ function SectionWrapper({
   preview,
   onSectionFocus,
   focusedSectionId,
+  onSectionHover,
+  hoveredSectionId,
   children,
   className = '',
 }: {
@@ -141,11 +157,14 @@ function SectionWrapper({
   preview?: boolean;
   onSectionFocus?: (sectionId: SectionId) => void;
   focusedSectionId?: SectionId | null;
+  onSectionHover?: (sectionId: SectionId | null) => void;
+  hoveredSectionId?: SectionId | null;
   children: React.ReactNode;
   className?: string;
 }) {
   const isInteractive = preview && onSectionFocus;
   const isFocused = focusedSectionId === sectionId;
+  const isHovered = hoveredSectionId === sectionId;
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     onSectionFocus?.(sectionId);
@@ -159,10 +178,14 @@ function SectionWrapper({
       role="button"
       tabIndex={0}
       onClick={handleClick}
+      onMouseEnter={() => onSectionHover?.(sectionId)}
+      onMouseLeave={() => onSectionHover?.(null)}
       className={`rounded-xl border-[0.7px] transition-colors focus:outline-none focus-visible:ring-[0.7px] focus-visible:ring-zinc-400 focus-visible:ring-offset-2 dark:focus-visible:ring-zinc-500 dark:focus-visible:ring-offset-zinc-950 ${
         isFocused
           ? 'border-zinc-300 bg-zinc-50/80 dark:border-zinc-600 dark:bg-zinc-900/60'
-          : 'border-transparent hover:border-zinc-200 hover:bg-zinc-50/50 dark:hover:border-zinc-700 dark:hover:bg-zinc-900/40'
+          : isHovered
+            ? 'border-zinc-200 bg-zinc-50/50 dark:border-zinc-700 dark:bg-zinc-900/40'
+            : 'border-transparent hover:border-zinc-200 hover:bg-zinc-50/50 dark:hover:border-zinc-700 dark:hover:bg-zinc-900/40'
       } ${className}`}
     >
       {children}
@@ -170,13 +193,27 @@ function SectionWrapper({
   );
 }
 
-export function AppPageView({ data: d, reviews = [], preview, onSectionFocus, focusedSectionId, appID }: AppPageViewProps) {
+export function AppPageView({ data: d, reviews = [], preview, onSectionFocus, focusedSectionId, onSectionHover, hoveredSectionId, appID }: AppPageViewProps) {
   const embedUrl = embedVideoUrl(ensureAbsoluteUrl(d.video_url));
   const galleryUrls = d.gallery_image_urls.filter(Boolean);
   const { ref: galleryScrollRef, atStart: galleryAtStart, atEnd: galleryAtEnd } = useHorizontalFade();
   const { ref: reviewsScrollRef, atStart: reviewsAtStart, atEnd: reviewsAtEnd } = useHorizontalFade();
   const [showTestimonialForm, setShowTestimonialForm] = useState(false);
   const [expandedReview, setExpandedReview] = useState<ReviewItem | null>(null);
+
+  const freeTextRef = useRef<HTMLDivElement>(null);
+  const [freeTextExpanded, setFreeTextExpanded] = useState(false);
+  const [freeTextOverflows, setFreeTextOverflows] = useState(false);
+
+  useEffect(() => {
+    const el = freeTextRef.current;
+    if (!el) return;
+    const check = () => setFreeTextOverflows(el.scrollHeight > el.clientHeight + 2);
+    check();
+    const ro = new ResizeObserver(check);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [d.free_text_markdown]);
 
   return (
     <div className="min-h-screen bg-white text-zinc-900 dark:bg-zinc-950 dark:text-zinc-50">
@@ -202,6 +239,8 @@ export function AppPageView({ data: d, reviews = [], preview, onSectionFocus, fo
           preview={preview}
           onSectionFocus={onSectionFocus}
           focusedSectionId={focusedSectionId}
+          onSectionHover={onSectionHover}
+          hoveredSectionId={hoveredSectionId}
           className="-mx-2 px-2"
         >
         <section className="flex flex-row items-start gap-4 py-6">
@@ -244,6 +283,8 @@ export function AppPageView({ data: d, reviews = [], preview, onSectionFocus, fo
           preview={preview}
           onSectionFocus={onSectionFocus}
           focusedSectionId={focusedSectionId}
+          onSectionHover={onSectionHover}
+          hoveredSectionId={hoveredSectionId}
           className="-mx-2 px-2"
         >
         <section className="flex flex-wrap items-center gap-3 py-6 border-t-[0.7px] border-zinc-200 dark:border-zinc-800">
@@ -272,6 +313,8 @@ export function AppPageView({ data: d, reviews = [], preview, onSectionFocus, fo
             preview={preview}
             onSectionFocus={onSectionFocus}
             focusedSectionId={focusedSectionId}
+            onSectionHover={onSectionHover}
+            hoveredSectionId={hoveredSectionId}
             className="-mx-2 px-2"
           >
           <section className="py-6 border-t-[0.7px] border-zinc-200 dark:border-zinc-800">
@@ -295,7 +338,7 @@ export function AppPageView({ data: d, reviews = [], preview, onSectionFocus, fo
                       </div>
                       {note.body && (
                         <div className="mt-1 prose prose-sm prose-zinc dark:prose-invert max-w-none">
-                          <ReactMarkdown remarkPlugins={REMARK_PLUGINS}>{note.body}</ReactMarkdown>
+                          <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={MARKDOWN_COMPONENTS}>{note.body}</ReactMarkdown>
                         </div>
                       )}
                     </li>
@@ -314,6 +357,8 @@ export function AppPageView({ data: d, reviews = [], preview, onSectionFocus, fo
             preview={preview}
             onSectionFocus={onSectionFocus}
             focusedSectionId={focusedSectionId}
+            onSectionHover={onSectionHover}
+            hoveredSectionId={hoveredSectionId}
             className="-mx-2 px-2"
           >
           <section className="py-6 border-t-[0.7px] border-zinc-200 dark:border-zinc-800">
@@ -336,6 +381,8 @@ export function AppPageView({ data: d, reviews = [], preview, onSectionFocus, fo
             preview={preview}
             onSectionFocus={onSectionFocus}
             focusedSectionId={focusedSectionId}
+            onSectionHover={onSectionHover}
+            hoveredSectionId={hoveredSectionId}
             className="-mx-2 px-2"
           >
           <section className="py-6 border-t-[0.7px] border-zinc-200 dark:border-zinc-800">
@@ -381,6 +428,8 @@ export function AppPageView({ data: d, reviews = [], preview, onSectionFocus, fo
             preview={preview}
             onSectionFocus={onSectionFocus}
             focusedSectionId={focusedSectionId}
+            onSectionHover={onSectionHover}
+            hoveredSectionId={hoveredSectionId}
             className="-mx-2 px-2"
           >
           <section className="py-6 border-t-[0.7px] border-zinc-200 dark:border-zinc-800">
@@ -398,8 +447,27 @@ export function AppPageView({ data: d, reviews = [], preview, onSectionFocus, fo
                   />
                 </div>
               )}
-              <div className="min-w-0 flex-1 whitespace-pre-wrap text-sm text-zinc-700 dark:text-zinc-300">
-                {d.free_text_markdown}
+              <div className="min-w-0 flex-1 relative">
+                <div
+                  ref={freeTextRef}
+                  className={`prose prose-sm prose-zinc dark:prose-invert max-w-none text-zinc-700 dark:text-zinc-300 overflow-hidden transition-[max-height] duration-300 ${
+                    freeTextExpanded ? '' : 'max-h-[12rem]'
+                  }`}
+                >
+                  <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={MARKDOWN_COMPONENTS}>{d.free_text_markdown}</ReactMarkdown>
+                </div>
+                {freeTextOverflows && !freeTextExpanded && (
+                  <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-white dark:from-zinc-950 to-transparent pointer-events-none" />
+                )}
+                {freeTextOverflows && (
+                  <button
+                    type="button"
+                    onClick={() => setFreeTextExpanded((v) => !v)}
+                    className="mt-2 text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline"
+                  >
+                    {freeTextExpanded ? '閉じる' : 'すべて見る'}
+                  </button>
+                )}
               </div>
             </div>
           </section>
@@ -413,6 +481,8 @@ export function AppPageView({ data: d, reviews = [], preview, onSectionFocus, fo
             preview={preview}
             onSectionFocus={onSectionFocus}
             focusedSectionId={focusedSectionId}
+            onSectionHover={onSectionHover}
+            hoveredSectionId={hoveredSectionId}
             className="-mx-2 px-2"
           >
           <section className="py-6 border-t-[0.7px] border-zinc-200 dark:border-zinc-800">
@@ -555,6 +625,8 @@ export function AppPageView({ data: d, reviews = [], preview, onSectionFocus, fo
             preview={preview}
             onSectionFocus={onSectionFocus}
             focusedSectionId={focusedSectionId}
+            onSectionHover={onSectionHover}
+            hoveredSectionId={hoveredSectionId}
             className="-mx-2 px-2"
           >
           <section className="py-6 border-t-[0.7px] border-zinc-200 dark:border-zinc-800">
@@ -620,6 +692,8 @@ export function AppPageView({ data: d, reviews = [], preview, onSectionFocus, fo
             preview={preview}
             onSectionFocus={onSectionFocus}
             focusedSectionId={focusedSectionId}
+            onSectionHover={onSectionHover}
+            hoveredSectionId={hoveredSectionId}
             className="-mx-2 px-2"
           >
           <section className="py-6 border-t-[0.7px] border-zinc-200 dark:border-zinc-800">
@@ -652,6 +726,8 @@ export function AppPageView({ data: d, reviews = [], preview, onSectionFocus, fo
           preview={preview}
           onSectionFocus={onSectionFocus}
           focusedSectionId={focusedSectionId}
+          onSectionHover={onSectionHover}
+          hoveredSectionId={hoveredSectionId}
           className="-mx-2 px-2"
         >
         <section className="py-6 border-t-[0.7px] border-zinc-200 dark:border-zinc-800">
@@ -714,6 +790,8 @@ export function AppPageView({ data: d, reviews = [], preview, onSectionFocus, fo
             preview={preview}
             onSectionFocus={onSectionFocus}
             focusedSectionId={focusedSectionId}
+            onSectionHover={onSectionHover}
+            hoveredSectionId={hoveredSectionId}
             className="-mx-2 px-2"
           >
           <section className="py-6 border-t-[0.7px] border-zinc-200 dark:border-zinc-800">
@@ -762,6 +840,8 @@ export function AppPageView({ data: d, reviews = [], preview, onSectionFocus, fo
         preview={preview}
         onSectionFocus={onSectionFocus}
         focusedSectionId={focusedSectionId}
+        onSectionHover={onSectionHover}
+        hoveredSectionId={hoveredSectionId}
         className="-mx-2 px-2"
       >
         <footer className="py-6 text-center">

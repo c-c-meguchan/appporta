@@ -1,7 +1,7 @@
 'use client';
 
 import { useParams, useRouter } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { AppPageView, type ReviewItem } from '@/components/app-page-view/AppPageView';
 import { AppPageHeader } from '@/components/AppPageHeader';
@@ -95,6 +95,7 @@ export default function StudioAppEditPage() {
 
   const [form, setForm] = useState<AppFormState>(defaultFormState);
   const [focusedSection, setFocusedSection] = useState<SectionId | null>(null);
+  const [hoveredSection, setHoveredSection] = useState<SectionId | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
@@ -389,126 +390,131 @@ export default function StudioAppEditPage() {
       <div className="flex h-[calc(100vh-2.5rem)] min-h-0">
         {/* 左: セクション未選択時は表示/非表示一覧、選択時は編集シートのみ */}
         <div className="flex w-[280px] min-w-[280px] flex-shrink-0 flex-col overflow-hidden border-r-[0.7px] border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950">
-          {focusedSection == null ? (
-            /* セクション未選択: 左カラムいっぱいにセクション一覧 */
-            <div className="flex flex-1 flex-col overflow-y-auto p-4">
+          <div
+            className="flex min-h-0 flex-1 transition-transform duration-300 ease-in-out"
+            style={{ width: '200%', transform: focusedSection == null ? 'translateX(0)' : 'translateX(-50%)' }}
+          >
+            {/* セクション一覧 */}
+            <div className={`flex w-1/2 flex-col ${focusedSection == null ? 'overflow-y-auto' : 'overflow-hidden'} p-4`}>
               <h2 className="mb-4 text-base font-semibold text-zinc-900 dark:text-zinc-50">
                 セクション一覧
               </h2>
-              <div className="flex flex-col gap-1">
+              <div className="flex flex-col divide-y divide-zinc-200 dark:divide-zinc-700">
                 {SECTIONS.map((section) => {
                   const visKey = VISIBILITY_KEYS[section.id];
                   const isVisible = visKey && (form[visKey] as boolean);
                   const isRequired = section.necessary === 'required';
                   const isOn = isRequired || !!isVisible;
-                  const showSwitch = isRequired || visKey;
+                  const isItemHovered = hoveredSection === section.id;
                   return (
                     <button
                       key={section.id}
                       type="button"
                       onClick={() => setFocusedSection(section.id)}
-                      className="flex items-center justify-between gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-2 text-left transition hover:border-zinc-300 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:border-zinc-600 dark:hover:bg-zinc-800"
+                      onMouseEnter={() => setHoveredSection(section.id)}
+                      onMouseLeave={() => setHoveredSection(null)}
+                      className={`flex items-center gap-2 px-1 py-2.5 text-left transition hover:bg-zinc-100 dark:hover:bg-zinc-800/50 ${
+                        isItemHovered ? 'bg-zinc-100 dark:bg-zinc-800/50' : ''
+                      }`}
                     >
+                      {isRequired ? (
+                        <span
+                          aria-label="常に表示"
+                          className="flex shrink-0 items-center justify-center rounded-lg border-[0.7px] border-zinc-200 p-1.5 text-zinc-300 opacity-50 dark:border-zinc-700 dark:text-zinc-600"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4">
+                            <path d="M10.088 13.413Q9.3 12.625 9.3 11.5t.788-1.912T12 8.8t1.913.788t.787 1.912t-.787 1.913T12 14.2t-1.912-.787M12 19q-3.65 0-6.65-2.037T1 11.5q1.35-3.425 4.35-5.462T12 4q3.525 0 6.438 1.9T22.8 11H19q-.7 0-1.325.175t-1.175.5V11.5q0-1.875-1.312-3.187T12 7T8.813 8.313T7.5 11.5t1.313 3.188T12 16q.55 0 1.063-.125t.962-.35q-.025.125-.025.238v3.062q-.5.075-1 .125T12 19m5 2q-.425 0-.712-.288T16 20v-3q0-.425.288-.712T17 16v-1q0-.825.588-1.412T19 13t1.413.588T21 15v1q.425 0 .713.288T22 17v3q0 .425-.288.713T21 21zm1-5h2v-1q0-.425-.288-.712T19 14t-.712.288T18 15z" />
+                          </svg>
+                        </span>
+                      ) : visKey ? (
+                        <span
+                          role="button"
+                          aria-label={isOn ? '非表示にする' : '表示する'}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setVisibility(visKey, !isVisible);
+                          }}
+                          className={`flex shrink-0 items-center justify-center rounded-lg border-[0.7px] p-1.5 transition ${
+                            isOn
+                              ? 'border-blue-400 bg-blue-50 text-blue-600 hover:bg-blue-100 dark:border-blue-500 dark:bg-blue-950 dark:text-blue-400 dark:hover:bg-blue-900'
+                              : 'border-zinc-200 text-zinc-300 hover:bg-white dark:border-zinc-700 dark:text-zinc-600 dark:hover:bg-zinc-800'
+                          }`}
+                        >
+                          {isOn ? (
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4">
+                              <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17a5 5 0 1 1 0-10 5 5 0 0 1 0 10zm0-8a3 3 0 1 0 0 6 3 3 0 0 0 0-6z" />
+                            </svg>
+                          ) : (
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                              <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                              <line x1="1" y1="1" x2="23" y2="23" />
+                            </svg>
+                          )}
+                        </span>
+                      ) : null}
                       <span className="min-w-0 flex-1 text-sm font-medium text-zinc-900 dark:text-zinc-100">
                         {section.nameJa}
                       </span>
-                      {showSwitch ? (
-                        <span className="flex shrink-0 items-center gap-2">
-                          {isRequired ? (
-                            <Tooltip content="このセクションは非表示にできません" placement="top">
-                              <span
-                                role="switch"
-                                aria-checked={isOn}
-                                aria-disabled={true}
-                                onClick={(e) => e.stopPropagation()}
-                                className="relative inline-flex h-5 w-9 flex-shrink-0 cursor-not-allowed rounded-full opacity-50 ring-1 ring-zinc-300 transition-colors focus:outline-none bg-blue-600 dark:bg-blue-500 dark:ring-zinc-600"
-                              >
-                                <span className="pointer-events-none absolute top-0.5 left-0.5 h-4 w-4 translate-x-4 rounded-full bg-white shadow-sm" />
-                              </span>
-                            </Tooltip>
-                          ) : (
-                            <span
-                              role="switch"
-                              aria-checked={isOn}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (visKey) setVisibility(visKey, !isVisible);
-                              }}
-                              className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full transition-colors focus:outline-none focus:ring-[0.7px] focus:ring-zinc-400 ${
-                                isOn ? 'bg-blue-600 dark:bg-blue-500' : 'bg-zinc-200 dark:bg-zinc-700'
-                              }`}
-                            >
-                              <span
-                                className={`pointer-events-none absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${
-                                  isOn ? 'translate-x-4' : 'translate-x-0'
-                                }`}
-                              />
-                            </span>
-                          )}
-                          <span className="text-zinc-400 dark:text-zinc-500" aria-hidden>
-                            ›
-                          </span>
-                        </span>
-                      ) : (
-                        <span className="shrink-0 text-zinc-400 dark:text-zinc-500" aria-hidden>
-                          ›
-                        </span>
-                      )}
+                      <span className="shrink-0 text-zinc-400 dark:text-zinc-500" aria-hidden>
+                        ›
+                      </span>
                     </button>
                   );
                 })}
               </div>
             </div>
-          ) : (
-            /* セクション選択時: 編集シートのみ（「セクションを編集」メニューは出さない） */
-            <div className="flex flex-1 flex-col overflow-y-auto rounded-r-xl border-l-[0.7px] border-zinc-200 bg-white shadow-[4px_0_12px_rgba(0,0,0,0.08)] dark:border-zinc-700 dark:bg-zinc-900 dark:shadow-[4px_0_16px_rgba(0,0,0,0.3)]">
+            {/* セクション詳細 */}
+            <div className={`flex w-1/2 flex-col ${focusedSection != null ? 'overflow-y-auto' : 'overflow-hidden'} rounded-r-xl border-l-[0.7px] border-zinc-200 bg-white shadow-[4px_0_12px_rgba(0,0,0,0.08)] dark:border-zinc-700 dark:bg-zinc-900 dark:shadow-[4px_0_16px_rgba(0,0,0,0.3)]`}>
               <div className="p-4">
                 <button
                   type="button"
                   onClick={() => setFocusedSection(null)}
-                  className="mb-4 inline-flex items-center gap-2 rounded-lg border-[0.7px] border-zinc-300 bg-white px-4 py-1.5 text-sm font-medium text-zinc-800 transition hover:bg-zinc-100 disabled:opacity-60 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-50 dark:hover:bg-zinc-800"
+                  className="mb-4 inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm font-medium text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
                 >
                   <ArrowLeftIcon className="h-4 w-4 shrink-0" />
                   一覧に戻る
                 </button>
-                <h1 className="mb-4 text-base font-semibold text-zinc-900 dark:text-zinc-50">
-                  {currentSectionName}
-                </h1>
-
-                {/* セクション表示切替（必須は常にオン・無効） */}
                 {(() => {
                   const isRequired = focusedSection != null && SECTIONS.find((s) => s.id === focusedSection)?.necessary === 'required';
                   const isOn = isRequired || !!(visibilityKey && (form[visibilityKey] as boolean));
-                  const isDisabled = isRequired;
                   return (
-              <div className="mb-4 flex items-center gap-2">
-                <span className="text-sm text-zinc-600 dark:text-zinc-400">
-                  このセクションを表示
-                </span>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={isOn}
-                  aria-disabled={isDisabled}
-                  disabled={isDisabled}
-                  onClick={() => !isDisabled && visibilityKey && setVisibility(visibilityKey, !(form[visibilityKey] as boolean))}
-                  className={`relative inline-flex h-5 w-9 flex-shrink-0 rounded-full transition-colors focus:outline-none focus:ring-[0.7px] focus:ring-zinc-400 ${
-                    isDisabled
-                      ? 'cursor-not-allowed opacity-50'
-                      : ''
-                  } ${
-                    isOn
-                      ? 'bg-blue-600 dark:bg-blue-500'
-                      : 'bg-zinc-200 dark:bg-zinc-700'
-                  }`}
-                >
-                  <span
-                    className={`pointer-events-none absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${
-                      isOn ? 'translate-x-4' : 'translate-x-0'
-                    }`}
-                  />
-                </button>
-              </div>
+                    <div className="mb-4 flex items-center justify-between">
+                      <h1 className="text-base font-semibold text-zinc-900 dark:text-zinc-50">
+                        {currentSectionName}
+                      </h1>
+                      {isRequired ? (
+                        <span
+                          aria-label="常に表示"
+                          className="flex shrink-0 items-center justify-center rounded-lg border-[0.7px] border-zinc-200 p-1.5 text-zinc-300 opacity-50 dark:border-zinc-700 dark:text-zinc-600"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4">
+                            <path d="M10.088 13.413Q9.3 12.625 9.3 11.5t.788-1.912T12 8.8t1.913.788t.787 1.912t-.787 1.913T12 14.2t-1.912-.787M12 19q-3.65 0-6.65-2.037T1 11.5q1.35-3.425 4.35-5.462T12 4q3.525 0 6.438 1.9T22.8 11H19q-.7 0-1.325.175t-1.175.5V11.5q0-1.875-1.312-3.187T12 7T8.813 8.313T7.5 11.5t1.313 3.188T12 16q.55 0 1.063-.125t.962-.35q-.025.125-.025.238v3.062q-.5.075-1 .125T12 19m5 2q-.425 0-.712-.288T16 20v-3q0-.425.288-.712T17 16v-1q0-.825.588-1.412T19 13t1.413.588T21 15v1q.425 0 .713.288T22 17v3q0 .425-.288.713T21 21zm1-5h2v-1q0-.425-.288-.712T19 14t-.712.288T18 15z" />
+                          </svg>
+                        </span>
+                      ) : visibilityKey ? (
+                        <button
+                          type="button"
+                          aria-label={isOn ? '非表示にする' : '表示する'}
+                          onClick={() => setVisibility(visibilityKey, !(form[visibilityKey] as boolean))}
+                          className={`flex shrink-0 items-center justify-center rounded-lg border-[0.7px] p-1.5 transition ${
+                            isOn
+                              ? 'border-blue-400 bg-blue-50 text-blue-600 hover:bg-blue-100 dark:border-blue-500 dark:bg-blue-950 dark:text-blue-400 dark:hover:bg-blue-900'
+                              : 'border-zinc-200 text-zinc-300 hover:bg-white dark:border-zinc-700 dark:text-zinc-600 dark:hover:bg-zinc-800'
+                          }`}
+                        >
+                          {isOn ? (
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4">
+                              <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17a5 5 0 1 1 0-10 5 5 0 0 1 0 10zm0-8a3 3 0 1 0 0 6 3 3 0 0 0 0-6z" />
+                            </svg>
+                          ) : (
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                              <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                              <line x1="1" y1="1" x2="23" y2="23" />
+                            </svg>
+                          )}
+                        </button>
+                      ) : null}
+                    </div>
                   );
                 })()}
 
@@ -1047,7 +1053,7 @@ export default function StudioAppEditPage() {
             </p>
               </div>
             </div>
-          )}
+          </div>
         </div>
 
         {/* 右: 公開サイトに近いプレビュー */}
@@ -1069,6 +1075,8 @@ export default function StudioAppEditPage() {
                 preview
                 onSectionFocus={setFocusedSection}
                 focusedSectionId={focusedSection}
+                onSectionHover={setHoveredSection}
+                hoveredSectionId={hoveredSection}
               />
             </div>
           </div>
