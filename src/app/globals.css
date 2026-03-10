@@ -55,3 +55,12 @@ body {
 .animate-url-error-in {
   animation: url-error-in 0.2s ease-out forwards;
 }
+
+.markdown-free-text table {
+  table-layout: auto;
+}
+
+.markdown-free-text table th:first-child {
+  min-width: 5em;
+  white-space: nowrap;
+}
