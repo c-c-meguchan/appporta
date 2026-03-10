@@ -9,9 +9,7 @@ const REMARK_PLUGINS = [remarkGfm];
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const MARKDOWN_COMPONENTS = {
-  th: ({ node, style, children, ...props }: any) => (
-    <th {...props} style={{ ...style, fontWeight: 'normal' }}>{children}</th>
-  ),
+  // 見出し行(th)は prose のデフォルト太字のまま。データ行(td)のみ font-weight を明示
   td: ({ node, style, children, ...props }: any) => (
     <td {...props} style={{ ...style, fontWeight: 'normal' }}>{children}</td>
   ),
@@ -450,7 +448,7 @@ export function AppPageView({ data: d, reviews = [], preview, onSectionFocus, fo
               <div className="min-w-0 flex-1 relative">
                 <div
                   ref={freeTextRef}
-                  className={`prose prose-sm prose-zinc dark:prose-invert max-w-none text-zinc-700 dark:text-zinc-300 overflow-hidden transition-[max-height] duration-300 ${
+                  className={`prose prose-sm prose-zinc dark:prose-invert max-w-none text-zinc-700 dark:text-zinc-300 overflow-hidden transition-[max-height] duration-300 markdown-free-text ${
                     freeTextExpanded ? '' : 'max-h-[12rem]'
                   }`}
                 >
