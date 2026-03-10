@@ -335,7 +335,7 @@ export function AppPageView({ data: d, reviews = [], preview, onSectionFocus, fo
                         {note.date && <span className="text-xs text-zinc-400 dark:text-zinc-500">{note.date}</span>}
                       </div>
                       {note.body && (
-                        <div className="mt-1 prose prose-sm prose-zinc dark:prose-invert max-w-none">
+                        <div className="mt-1 prose prose-sm prose-zinc dark:prose-invert max-w-none markdown-free-text">
                           <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={MARKDOWN_COMPONENTS}>{note.body}</ReactMarkdown>
                         </div>
                       )}
@@ -448,22 +448,22 @@ export function AppPageView({ data: d, reviews = [], preview, onSectionFocus, fo
               <div className="min-w-0 flex-1 relative">
                 <div
                   ref={freeTextRef}
-                  className={`prose prose-sm prose-zinc dark:prose-invert max-w-none text-zinc-700 dark:text-zinc-300 overflow-hidden transition-[max-height] duration-300 markdown-free-text ${
+                  className={`relative prose prose-sm prose-zinc dark:prose-invert max-w-none text-zinc-700 dark:text-zinc-300 overflow-hidden transition-[max-height] duration-300 markdown-free-text ${
                     freeTextExpanded ? '' : 'max-h-[12rem]'
                   }`}
                 >
                   <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={MARKDOWN_COMPONENTS}>{d.free_text_markdown}</ReactMarkdown>
+                  {freeTextOverflows && !freeTextExpanded && (
+                    <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-white dark:from-zinc-950 to-transparent pointer-events-none" />
+                  )}
                 </div>
-                {freeTextOverflows && !freeTextExpanded && (
-                  <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-white dark:from-zinc-950 to-transparent pointer-events-none" />
-                )}
-                {freeTextOverflows && (
+                {(freeTextOverflows || freeTextExpanded) && (
                   <button
                     type="button"
                     onClick={() => setFreeTextExpanded((v) => !v)}
-                    className="mt-2 text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline"
+                    className="mt-2 text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline bg-white dark:bg-transparent"
                   >
-                    {freeTextExpanded ? '閉じる' : 'すべて見る'}
+                    {freeTextExpanded ? '表示を省略' : 'すべて見る'}
                   </button>
                 )}
               </div>
