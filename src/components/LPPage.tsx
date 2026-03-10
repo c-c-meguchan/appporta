@@ -54,24 +54,29 @@ export default function LPPage({
           <p className="mb-10 text-lg text-zinc-600 dark:text-zinc-400">
             アプリのLPを簡単に作成・公開できるサービスです。
           </p>
-          <form onSubmit={handleSubmit} className="flex flex-col gap-3 sm:flex-row sm:justify-center">
-            <input
-              type="text"
-              value={appName}
-              onChange={(e) => setAppName(e.target.value)}
-              placeholder="あなたのアプリ名を取得"
-              className="w-full rounded-lg border-[0.7px] border-zinc-300 bg-white px-4 py-3 text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-400 focus:outline-none focus:ring-1 focus:ring-zinc-400 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-50 dark:placeholder:text-zinc-500 dark:focus:border-zinc-500 dark:focus:ring-zinc-500 sm:w-72"
-              aria-label="アプリ名（取得したい文字列）"
-            />
+          <form onSubmit={handleSubmit} className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-center">
+            <div className="flex w-full items-stretch overflow-hidden rounded-lg border-[0.7px] border-zinc-300 bg-white dark:border-zinc-600 dark:bg-zinc-900 sm:w-auto">
+              <span className="flex items-center border-r-[0.7px] border-zinc-300 bg-zinc-50 px-4 py-3 text-zinc-600 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
+                https://appporta.com/
+              </span>
+              <input
+                type="text"
+                value={appName}
+                onChange={(e) => setAppName(e.target.value)}
+                placeholder="your-app"
+                className="min-w-0 flex-1 border-0 bg-transparent px-4 py-3 text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-0 dark:text-zinc-50 dark:placeholder:text-zinc-500 sm:w-52"
+                aria-label="あなたのアプリ名（URLの一部になります）"
+              />
+            </div>
             <button
               type="submit"
               className="shrink-0 rounded-lg bg-zinc-900 px-6 py-3 text-sm font-medium text-zinc-50 transition hover:bg-zinc-800 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-200"
             >
-              はじめる
+              公式ページを作成
             </button>
           </form>
           <p className="mt-4 text-xs text-zinc-500 dark:text-zinc-400">
-            はじめるを押すと studio.appporta.com のサインアップへ進み、アプリIDを取得して登録できます。
+            公式ページを作成を押すと studio.appporta.com のサインアップへ進みます。
           </p>
         </div>
       </main>
