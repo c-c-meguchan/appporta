@@ -52,7 +52,7 @@ export default function LPPage({
             App Porta
           </h1>
           <p className="mb-10 text-lg text-zinc-600 dark:text-zinc-400">
-            アプリのLPを簡単に作成・公開できるサービスです。
+            個人開発アプリのための美しい公式ページ開設サービス
           </p>
           <form onSubmit={handleSubmit} className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-center">
             <div className="flex w-full items-stretch overflow-hidden rounded-lg border-[0.7px] border-zinc-300 bg-white dark:border-zinc-600 dark:bg-zinc-900 sm:w-auto">
@@ -70,13 +70,13 @@ export default function LPPage({
             </div>
             <button
               type="submit"
-              className="shrink-0 rounded-lg bg-zinc-900 px-6 py-3 text-sm font-medium text-zinc-50 transition hover:bg-zinc-800 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-200"
+              className="shrink-0 inline-flex items-center justify-center rounded-lg bg-zinc-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
             >
               公式ページを作成
             </button>
           </form>
           <p className="mt-4 text-xs text-zinc-500 dark:text-zinc-400">
-            公式ページを作成を押すと studio.appporta.com のサインアップへ進みます。
+            クレジットカード不要で公開できます。
           </p>
         </div>
       </main>
