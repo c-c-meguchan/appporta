@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { AppPageView, type ReviewItem } from '@/components/app-page-view/AppPageView';
+import { Tooltip } from '@/components/Tooltip';
 import { type AppFormState, type ReleaseNote, type SectionId, defaultFormState, SECTIONS, type FeaturedItem, parseBmcButtonConfig, parseBmcScriptTag } from './types';
 
 const INPUT_CLASS =
@@ -483,6 +484,17 @@ export default function StudioAppEditPage() {
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950">
       <header className="flex items-center justify-between border-b-[0.7px] border-zinc-200 bg-white px-4 py-2 text-sm dark:border-zinc-800 dark:bg-zinc-900">
         <div className="flex items-center gap-2">
+          <Tooltip content="プロジェクト一覧に戻る" placement="bottom">
+            <Link
+              href="/apps"
+              className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+              aria-label="プロジェクト一覧に戻る"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M19 12H5M12 19l-7-7 7-7" />
+              </svg>
+            </Link>
+          </Tooltip>
           <span
             className={`h-2 w-2 shrink-0 rounded-full ${
               isPublished ? 'bg-emerald-500 dark:bg-emerald-400' : 'bg-zinc-400 dark:bg-zinc-500'
@@ -1236,7 +1248,7 @@ export default function StudioAppEditPage() {
             role="presentation"
             onClick={() => setFocusedSection(null)}
           >
-            <div className="mx-auto w-full max-w-2xl px-4 sm:px-8">
+            <div className="mx-auto w-full max-w-3xl">
               <AppPageView
                 data={{
                   ...form,
