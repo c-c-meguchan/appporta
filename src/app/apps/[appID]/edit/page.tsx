@@ -1063,7 +1063,7 @@ export default function StudioAppEditPage() {
             role="presentation"
             onClick={() => setFocusedSection(null)}
           >
-            <div className="mx-auto w-full max-w-2xl px-4 sm:px-8">
+            <div className="mx-auto w-full max-w-3xl">
               <AppPageView
                 data={{
                   ...form,
