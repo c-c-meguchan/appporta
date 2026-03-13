@@ -6,7 +6,7 @@ import { getMainOriginClient } from '@/lib/constants';
 import { useAppChanges } from '@/context/AppChangesContext';
 import { Tooltip } from '@/components/Tooltip';
 
-function ArrowLeftIcon({ className }: { className?: string }) {
+function ChevronLeftIcon({ className }: { className?: string }) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -19,7 +19,7 @@ function ArrowLeftIcon({ className }: { className?: string }) {
       className={className}
       aria-hidden
     >
-      <path d="M19 12H5M12 19l-7-7 7-7" />
+      <polyline points="15 18 9 12 15 6" />
     </svg>
   );
 }
@@ -69,6 +69,8 @@ export type AppPageHeaderTab = 'edit' | 'settings' | 'analytics' | 'testimonials
 export type AppPageHeaderProps = {
   appID: string;
   isPublished: boolean;
+  /** アプリのタイトル（任意）。指定されていれば公開URLの上に表示されます。 */
+  appTitle?: string;
   onSave?: () => void | Promise<void>;
   onPublish?: () => void | Promise<void>;
   onUnpublish?: () => void | Promise<void>;
@@ -79,6 +81,7 @@ export type AppPageHeaderProps = {
 export function AppPageHeader({
   appID,
   isPublished,
+  appTitle,
   onSave,
   onPublish,
   onUnpublish,
@@ -90,6 +93,7 @@ export function AppPageHeader({
   const editDirty = changes?.editDirty ?? false;
   const settingsUrlPending = changes?.settingsUrlPending ?? false;
   const testimonialsDirty = changes?.testimonialsDirty ?? false;
+  const testimonialsHasNew = changes?.testimonialsHasNew ?? false;
   const hasAnyPending = editDirty || settingsUrlPending || testimonialsDirty;
 
   const base = `/apps/${appID}`;
@@ -100,7 +104,8 @@ export function AppPageHeader({
     { id: 'edit', href: `${base}/edit`, label: 'エディター', Icon: PencilIcon, badge: editDirty },
     { id: 'settings', href: `${base}/settings`, label: '設定', Icon: GearIcon, badge: settingsUrlPending },
     { id: 'testimonials', href: `${base}/testimonials`, label: 'ユーザーの声', Icon: ChatBubbleIcon, badge: testimonialsDirty },
-    { id: 'analytics', href: `${base}/analytics`, label: 'アナリティクス', Icon: EqualizerIcon },
+    // ファーストリリースではアナリティクスは非表示
+    // { id: 'analytics', href: `${base}/analytics`, label: 'アナリティクス', Icon: EqualizerIcon },
   ];
 
   const currentTab = tabs.find((t) => pathname === t.href || pathname.startsWith(t.href + '/'))?.id ?? 'edit';
@@ -177,8 +182,8 @@ export function AppPageHeader({
   };
 
   return (
-    <header className="flex items-center justify-between gap-4 border-b-[0.7px] border-zinc-200 bg-white px-4 py-2 text-sm dark:border-zinc-800 dark:bg-zinc-900">
-      <div className="flex min-w-0 flex-1 items-center gap-3">
+    <header className="relative flex items-center justify-between gap-4 border-b-[0.7px] border-zinc-200 bg-white px-4 py-2 text-sm dark:border-zinc-800 dark:bg-zinc-900">
+      <div className="flex min-w-0 items-center gap-3">
         <div className="flex shrink-0 items-center gap-3">
           <Tooltip content="プロジェクト一覧に戻る" placement="bottom">
             <Link
@@ -186,28 +191,40 @@ export function AppPageHeader({
               className="flex h-8 w-8 items-center justify-center rounded-lg text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
               aria-label="プロジェクト一覧に戻る"
             >
-              <ArrowLeftIcon className="h-4 w-4" />
+              <ChevronLeftIcon className="h-4 w-4" />
             </Link>
           </Tooltip>
-          <div className="flex items-center gap-2">
-            <span
-              className={`h-2 w-2 shrink-0 rounded-full ${
-                isPublished ? 'bg-emerald-500 dark:bg-emerald-400' : 'bg-zinc-400 dark:bg-zinc-500'
-              }`}
-              title={isPublished ? '公開中' : '非公開'}
-              aria-hidden
-            />
-            <Link
-              href={publicUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="truncate text-xs text-zinc-500 transition-colors hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300"
-            >
-              {publicUrl}
-            </Link>
+          <div className="flex flex-col">
+            {appTitle && (
+              <div className="mb-0.5 max-w-xs truncate text-xs font-semibold text-zinc-900 dark:text-zinc-50">
+                {appTitle}
+              </div>
+            )}
+            <div className="flex items-center gap-2">
+              <span
+                className={`h-2 w-2 shrink-0 rounded-full ${
+                  isPublished ? 'bg-emerald-500 dark:bg-emerald-400' : 'bg-zinc-400 dark:bg-zinc-500'
+                }`}
+                title={isPublished ? '公開中' : '非公開'}
+                aria-hidden
+              />
+              <Link
+                href={publicUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="truncate text-xs text-zinc-500 transition-colors hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300"
+              >
+                {publicUrl}
+              </Link>
+            </div>
           </div>
         </div>
-        <nav className="flex shrink-0 items-center gap-0.5" aria-label="アプリメニュー">
+      </div>
+
+      <div className="flex shrink-0 items-center gap-2">{renderActions()}</div>
+
+      <nav className="pointer-events-none absolute inset-x-0 flex justify-center" aria-label="アプリメニュー">
+        <div className="pointer-events-auto flex items-center gap-0.5">
           {tabs.map(({ id, href, label, Icon, badge }) => {
             const isActive = currentTab === id;
             return (
@@ -223,9 +240,14 @@ export function AppPageHeader({
               >
                 <Icon className="h-4 w-4 shrink-0" />
                 <span className="hidden sm:inline">{label}</span>
+                {id === 'testimonials' && testimonialsHasNew && (
+                  <span className="ml-1 rounded-full bg-sky-500 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                    新着
+                  </span>
+                )}
                 {badge && (
                   <span
-                    className="h-2 w-2 shrink-0 rounded-full bg-orange-500 dark:bg-orange-400"
+                    className="ml-1 h-2 w-2 shrink-0 rounded-full bg-orange-500 dark:bg-orange-400"
                     title="未反映の変更あり"
                     aria-hidden
                   />
@@ -233,9 +255,8 @@ export function AppPageHeader({
               </Link>
             );
           })}
-        </nav>
-      </div>
-      <div className="flex shrink-0 items-center gap-2">{renderActions()}</div>
+        </div>
+      </nav>
     </header>
   );
 }

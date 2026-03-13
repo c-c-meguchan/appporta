@@ -16,10 +16,10 @@ const LABEL_CLASS =
   'block text-xs font-medium text-zinc-800 dark:text-zinc-200 mb-1';
 const SELECT_CLASS = `${INPUT_CLASS} pr-9`;
 
-function ArrowLeftIcon({ className }: { className?: string }) {
+function ChevronLeftIcon({ className }: { className?: string }) {
   return (
     <svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M19 12H5M12 19l-7-7 7-7" />
+      <polyline points="15 18 9 12 15 6" />
     </svg>
   );
 }
@@ -379,8 +379,8 @@ export default function StudioAppEditPage() {
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950">
       <AppPageHeader
         appID={appID}
-
         isPublished={isPublished}
+        appTitle={form.name}
         onSave={handleHeaderUpdate}
         onPublish={handlePublish}
         onUnpublish={handleUnpublish}
@@ -471,7 +471,7 @@ export default function StudioAppEditPage() {
                   onClick={() => setFocusedSection(null)}
                   className="mb-4 inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm font-medium text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
                 >
-                  <ArrowLeftIcon className="h-4 w-4 shrink-0" />
+                  <ChevronLeftIcon className="h-4 w-4 shrink-0" />
                   一覧に戻る
                 </button>
                 {(() => {

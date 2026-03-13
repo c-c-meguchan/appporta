@@ -17,6 +17,9 @@ type AppChangesContextValue = {
   applyUrlChange: () => Promise<boolean>;
   applyingUrl: boolean;
   testimonialsDirty: boolean;
+  /** ユーザーの声に未公開の投稿があるか（新着フラグ用） */
+  testimonialsHasNew: boolean;
+  setTestimonialsHasNew: (v: boolean) => void;
   pendingTestimonialChanges: Map<string, boolean>;
   stageTestimonialChange: (id: string, is_public: boolean) => void;
   unstageTestimonialChange: (id: string) => void;
@@ -47,6 +50,7 @@ export function AppChangesProvider({ appID, children }: AppChangesProviderProps)
   const [applyingUrl, setApplyingUrl] = useState(false);
   const [pendingTestimonialChanges, setPendingTestimonialChanges] = useState<Map<string, boolean>>(new Map());
   const testimonialsDirty = pendingTestimonialChanges.size > 0;
+  const [testimonialsHasNew, setTestimonialsHasNew] = useState(false);
 
   useEffect(() => {
     setPendingAppId(serverPending ?? null);
@@ -155,6 +159,8 @@ export function AppChangesProvider({ appID, children }: AppChangesProviderProps)
     applyUrlChange,
     applyingUrl,
     testimonialsDirty,
+    testimonialsHasNew,
+    setTestimonialsHasNew,
     pendingTestimonialChanges,
     stageTestimonialChange,
     unstageTestimonialChange,
