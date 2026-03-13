@@ -1,7 +1,7 @@
 'use client';
 
+import { use, useCallback, useEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppPageHeader } from '@/components/AppPageHeader';
 import { Tooltip } from '@/components/Tooltip';
 import { useAppChanges } from '@/context/AppChangesContext';
@@ -60,35 +60,93 @@ const DELETE_ITEM_CLASS =
   'flex w-full items-center gap-2 px-3 py-2 text-xs text-red-600 transition hover:bg-zinc-50 dark:text-red-400 dark:hover:bg-zinc-800';
 
 export default function AppTestimonialPage() {
-  const params = useParams();
-  const appID = typeof params.appID === 'string' ? params.appID : '';
+  const paramsPromiseRef = useRef<Promise<Record<string, string | string[]> | undefined> | null>(null);
+  if (paramsPromiseRef.current === null) {
+    const raw = useParams() as Record<string, string | string[]> | Promise<Record<string, string | string[]> | undefined>;
+    paramsPromiseRef.current = raw instanceof Promise ? raw : Promise.resolve(raw);
+  }
+  const params = use(paramsPromiseRef.current);
+  const appID = typeof params?.appID === 'string' ? params.appID : '';
   const { isPublished, publishing, loading: headerLoading, onPublish, onUnpublish } = useAppHeaderData(appID);
   const appChanges = useAppChanges();
 
   const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
+  const [readReviewIds, setReadReviewIds] = useState<Set<string>>(new Set());
+  /** 新着を一件ずつ表示するキュー（先頭から順に表示） */
+  const [newItemQueue, setNewItemQueue] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [modalMenuOpen, setModalMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const modalMenuRef = useRef<HTMLDivElement>(null);
+  /** 新着キューを fetch でセットしたのは初回だけにする（再 fetch で上書きしない） */
+  const hasFilledNewItemQueueRef = useRef(false);
+
+  const fetchReadState = useCallback(async (): Promise<Set<string>> => {
+    if (!appID) return new Set();
+    const { data, error } = await supabase
+      .from('review_reads')
+      .select('review_id')
+      .eq('app_id', appID);
+    if (error) return new Set();
+    return new Set((data ?? []).map((r: { review_id: string }) => r.review_id));
+  }, [appID]);
 
   const fetchTestimonials = useCallback(async () => {
     if (!appID) return;
     setLoading(true);
-    const { data, error } = await supabase
-      .from('reviews')
-      .select('id, user_icon_url, user_name, content, secret_message, is_public, created_at')
-      .eq('app_id', appID)
-      .order('created_at', { ascending: false });
+    const [reviewsRes, readSet] = await Promise.all([
+      supabase
+        .from('reviews')
+        .select('id, user_icon_url, user_name, content, secret_message, is_public, created_at')
+        .eq('app_id', appID)
+        .order('created_at', { ascending: false }),
+      fetchReadState(),
+    ]);
 
+    const { data: list, error } = reviewsRes;
     if (error) {
       console.error(error);
+      setTestimonials([]);
+      setReadReviewIds(new Set());
+      appChanges?.setTestimonialsHasNew(false);
     } else {
-      setTestimonials(data ?? []);
+      const items = list ?? [];
+      setTestimonials(items);
+      setReadReviewIds(readSet);
+      const hasNew = items.some((t) => !readSet.has(t.id));
+      appChanges?.setTestimonialsHasNew(hasNew);
+      const unreadIds = items.filter((t) => !readSet.has(t.id)).map((t) => t.id);
+      if (!hasFilledNewItemQueueRef.current) {
+        setNewItemQueue(unreadIds);
+        hasFilledNewItemQueueRef.current = true;
+      }
     }
     setLoading(false);
-  }, [appID]);
+  }, [appID, fetchReadState, appChanges]);
+
+  /** 一覧を閉じたとき（ページ離脱時）に表示中の全件を既読にする */
+  const testimonialsRef = useRef<Testimonial[]>([]);
+  const appIDRef = useRef<string>(appID);
+  testimonialsRef.current = testimonials;
+  appIDRef.current = appID;
+
+  useEffect(() => {
+    return () => {
+      const list = testimonialsRef.current;
+      const id = appIDRef.current;
+      if (!id || list.length === 0) return;
+      list.forEach((t) => {
+        void supabase
+          .from('review_reads')
+          .upsert(
+            { app_id: id, review_id: t.id, read_at: new Date().toISOString() },
+            { onConflict: 'app_id,review_id' }
+          );
+      });
+    };
+  }, []);
 
   useEffect(() => {
     fetchTestimonials();
@@ -142,6 +200,44 @@ export default function AppTestimonialPage() {
 
   const publicCount = testimonials.filter((t) => getEffectivePublic(t)).length;
   const expandedItem = expandedId ? testimonials.find((t) => t.id === expandedId) ?? null : null;
+  const newItemCurrent = newItemQueue.length > 0 ? testimonials.find((t) => t.id === newItemQueue[0]) ?? null : null;
+
+  const markReviewAsReadAndNext = useCallback(
+    (reviewId: string) => {
+      if (!appID) return;
+      void supabase
+        .from('review_reads')
+        .upsert(
+          { app_id: appID, review_id: reviewId, read_at: new Date().toISOString() },
+          { onConflict: 'app_id,review_id' }
+        );
+      setReadReviewIds((prev) => new Set(prev).add(reviewId));
+      setNewItemQueue((prev) => {
+        const next = prev.slice(1);
+        appChanges?.setTestimonialsHasNew(next.length > 0);
+        return next;
+      });
+    },
+    [appID, appChanges]
+  );
+
+  const handleNewItemPublish = useCallback(async () => {
+    if (!newItemCurrent || !appID) return;
+    const id = newItemCurrent.id;
+    // 掲載操作前に既読＋キュー更新して、このアイテムを新着から外す
+    markReviewAsReadAndNext(id);
+    const { error } = await supabase.from('reviews').update({ is_public: true }).eq('id', id);
+    if (error) {
+      console.error(error);
+      return;
+    }
+    setTestimonials((prev) => prev.map((t) => (t.id === id ? { ...t, is_public: true } : t)));
+  }, [newItemCurrent, appID, markReviewAsReadAndNext]);
+
+  const handleNewItemReadAndNext = useCallback(() => {
+    if (!newItemCurrent) return;
+    markReviewAsReadAndNext(newItemCurrent.id);
+  }, [newItemCurrent, markReviewAsReadAndNext]);
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950">
@@ -180,12 +276,18 @@ export default function AppTestimonialPage() {
                 {testimonials.map((t) => {
                   const isPublic = getEffectivePublic(t);
                   const hasPendingChange = pendingChanges.has(t.id);
+                  const isNew = !readReviewIds.has(t.id);
                   return (
                     <div
                       key={t.id}
                       className="relative rounded-xl border-[0.7px] border-zinc-200 bg-white px-3 py-5 transition hover:border-zinc-300 hover:shadow-sm dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-700"
                     >
                       <div className="absolute right-1.5 top-1.5 flex items-center">
+                        {isNew && (
+                          <span className="mr-1 rounded-full bg-sky-500 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                            新着
+                          </span>
+                        )}
                         <Tooltip content={isPublic ? '公開ページから取り下げ' : '公開ページに掲載'}>
                           <button
                             type="button"
@@ -274,13 +376,99 @@ export default function AppTestimonialPage() {
         )}
       </div>
 
-      {expandedItem && (
+      {/* 新着モーダル: ピンなし・下に「掲載する」「既読にして次へ」 */}
+      {newItemCurrent && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+          onClick={() => setNewItemQueue([])}
+        >
+          <div
+            className="relative mx-4 w-full max-w-md rounded-2xl border-[0.7px] border-zinc-200 bg-white p-6 shadow-xl dark:border-zinc-700 dark:bg-zinc-900"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="absolute right-3 top-3 flex items-center gap-1">
+              <span className="rounded-full bg-sky-500 px-2 py-0.5 text-xs font-semibold text-white">新着</span>
+              <button
+                type="button"
+                onClick={() => setNewItemQueue([])}
+                className="flex h-8 w-8 items-center justify-center rounded-md text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+                aria-label="閉じる"
+              >
+                <CloseIcon className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="flex flex-col items-center pt-2 text-center">
+              {newItemCurrent.user_icon_url ? (
+                <div className="h-14 w-14 overflow-hidden rounded-full">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={newItemCurrent.user_icon_url} alt="" className="h-full w-full object-cover" />
+                </div>
+              ) : (
+                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-zinc-100 dark:bg-zinc-800">
+                  <span className="text-lg font-medium text-zinc-400 dark:text-zinc-500">
+                    {newItemCurrent.user_name.charAt(0)}
+                  </span>
+                </div>
+              )}
+
+              <span className="mt-2 text-sm font-bold text-zinc-900 dark:text-zinc-50">
+                {newItemCurrent.user_name}
+              </span>
+
+              {newItemCurrent.content && (
+                <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-zinc-900 dark:text-zinc-100">
+                  {newItemCurrent.content}
+                </p>
+              )}
+
+              {newItemCurrent.secret_message && (
+                <div className="mt-4 flex w-full items-start gap-2 rounded-lg bg-zinc-100 px-3 py-3 text-left dark:bg-zinc-800">
+                  <LockIcon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-zinc-400 dark:text-zinc-500" />
+                  <p className="whitespace-pre-wrap text-sm text-zinc-600 dark:text-zinc-300">
+                    {newItemCurrent.secret_message}
+                  </p>
+                </div>
+              )}
+
+              <p className="mt-3 text-xs text-zinc-400 dark:text-zinc-500">
+                {new Date(newItemCurrent.created_at).toLocaleDateString('ja-JP')}
+              </p>
+            </div>
+
+            <div className="mt-6 flex gap-3">
+              <button
+                type="button"
+                onClick={handleNewItemReadAndNext}
+                className="flex flex-1 items-center justify-center gap-2 rounded-lg border-[0.7px] border-zinc-300 bg-white py-2.5 text-sm font-medium text-zinc-800 transition hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
+              >
+                既読にして次へ
+              </button>
+              <button
+                type="button"
+                onClick={handleNewItemPublish}
+                className="flex flex-1 items-center justify-center gap-2 rounded-lg border-[0.7px] border-blue-600 bg-blue-600 py-2.5 text-sm font-medium text-white transition hover:bg-blue-700 dark:border-blue-500 dark:bg-blue-500 dark:hover:bg-blue-600"
+              >
+                <PinIcon className="h-5 w-5 shrink-0" />
+                掲載する
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {expandedItem && !newItemCurrent && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setExpandedId(null)}>
           <div
             className="relative mx-4 w-full max-w-md rounded-2xl border-[0.7px] border-zinc-200 bg-white p-6 shadow-xl dark:border-zinc-700 dark:bg-zinc-900"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="absolute right-3 top-3 flex items-center gap-1">
+              {!readReviewIds.has(expandedItem.id) && (
+                <span className="rounded-full bg-sky-500 px-2 py-0.5 text-xs font-semibold text-white">
+                  新着
+                </span>
+              )}
               <Tooltip content={getEffectivePublic(expandedItem) ? '公開ページから取り下げ' : '公開ページに掲載'}>
                 <button
                   type="button"
