@@ -59,6 +59,7 @@ export default function AppSettingsPage() {
   const {
     isPublished,
     pendingAppId,
+    appTitle,
     publishing,
     loading,
     onPublish,
@@ -228,6 +229,7 @@ export default function AppSettingsPage() {
       <AppPageHeader
         appID={appID}
         isPublished={isPublished}
+        appTitle={appTitle}
         onPublish={onPublish}
         onUnpublish={onUnpublish}
         publishing={publishing}

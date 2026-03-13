@@ -7,13 +7,14 @@ import { useAppHeaderData } from '@/hooks/useAppHeaderData';
 export default function AppAnalyticsPage() {
   const params = useParams();
   const appID = typeof params.appID === 'string' ? params.appID : '';
-  const { isPublished, publishing, loading, onPublish, onUnpublish } = useAppHeaderData(appID);
+  const { isPublished, publishing, loading, appTitle, onPublish, onUnpublish } = useAppHeaderData(appID);
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950">
       <AppPageHeader
         appID={appID}
         isPublished={isPublished}
+        appTitle={appTitle}
         onPublish={onPublish}
         onUnpublish={onUnpublish}
         publishing={publishing}

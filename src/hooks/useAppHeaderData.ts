@@ -9,12 +9,13 @@ export function useAppHeaderData(appID: string) {
   const [pendingAppId, setPendingAppId] = useState<string | null>(null);
   const [publishing, setPublishing] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [appTitle, setAppTitle] = useState<string | undefined>(undefined);
 
   const fetchApp = useCallback(async () => {
     if (!appID) return;
     const { data, error } = await supabase
       .from('apps')
-      .select('is_published, pending_app_id')
+      .select('name, is_published, pending_app_id')
       .eq('app_id', appID)
       .maybeSingle();
     if (error) {
@@ -23,6 +24,7 @@ export function useAppHeaderData(appID: string) {
     }
     setIsPublished(Boolean(data?.is_published));
     setPendingAppId(data?.pending_app_id ?? null);
+    setAppTitle(data?.name ?? undefined);
     setLoading(false);
   }, [appID]);
 
@@ -44,5 +46,5 @@ export function useAppHeaderData(appID: string) {
     setPublishing(false);
   }, [appID]);
 
-  return { isPublished, pendingAppId, publishing, loading, onPublish, onUnpublish, refetch: fetchApp };
+  return { isPublished, pendingAppId, appTitle, publishing, loading, onPublish, onUnpublish, refetch: fetchApp };
 }
