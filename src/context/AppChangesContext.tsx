@@ -49,13 +49,43 @@ export function AppChangesProvider({ appID, children }: AppChangesProviderProps)
   const [showUrlConfirm, setShowUrlConfirm] = useState(false);
   const [applyingUrl, setApplyingUrl] = useState(false);
   const [pendingTestimonialChanges, setPendingTestimonialChanges] = useState<Map<string, boolean>>(new Map());
-  const testimonialsDirty = pendingTestimonialChanges.size > 0;
   const [testimonialsHasNew, setTestimonialsHasNew] = useState(false);
+  const testimonialsDirty = pendingTestimonialChanges.size > 0;
 
   useEffect(() => {
     setPendingAppId(serverPending ?? null);
     setSettingsUrlPending(!!(serverPending && serverPending !== appID));
   }, [serverPending, appID]);
+
+  // ヘッダーの新着バッジ用に、タブを開いた直後や再読み込み時でも未読があれば反映する
+  useEffect(() => {
+    if (!appID) return;
+    let cancelled = false;
+    const checkHasNewTestimonials = async () => {
+      const [reviewsRes, readsRes] = await Promise.all([
+        supabase
+          .from('reviews')
+          .select('id')
+          .eq('app_id', appID),
+        supabase
+          .from('review_reads')
+          .select('review_id')
+          .eq('app_id', appID),
+      ]);
+      if (cancelled) return;
+      if (reviewsRes.error || readsRes.error) {
+        return;
+      }
+      const allIds = (reviewsRes.data ?? []).map((r: { id: string }) => r.id);
+      const readIds = new Set((readsRes.data ?? []).map((r: { review_id: string }) => r.review_id));
+      const hasNew = allIds.some((id) => !readIds.has(id));
+      setTestimonialsHasNew(hasNew);
+    };
+    void checkHasNewTestimonials();
+    return () => {
+      cancelled = true;
+    };
+  }, [appID]);
 
   const applyUrlChange = useCallback(async (): Promise<boolean> => {
     const pending = pendingAppId;
