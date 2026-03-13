@@ -1,17 +1,12 @@
 'use client';
 
-import { use, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { AppChangesProvider, useAppChanges } from '@/context/AppChangesContext';
 import { getMainOriginClient } from '@/lib/constants';
 
 function UrlChangeConfirmModal() {
-  const paramsPromiseRef = useRef<Promise<Record<string, string | string[]> | undefined> | null>(null);
-  if (paramsPromiseRef.current === null) {
-    const raw = useParams() as Record<string, string | string[]> | Promise<Record<string, string | string[]> | undefined>;
-    paramsPromiseRef.current = raw instanceof Promise ? raw : Promise.resolve(raw);
-  }
-  const params = use(paramsPromiseRef.current);
+  // Next.js のクライアントコンポーネントでは useParams は同期オブジェクトとして扱う
+  const params = useParams() as Record<string, string | string[]>;
   const appID = typeof params?.appID === 'string' ? params.appID : '';
   const ctx = useAppChanges();
   if (!ctx) return null;
@@ -107,12 +102,7 @@ export default function AppLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const paramsPromiseRef = useRef<Promise<Record<string, string | string[]> | undefined> | null>(null);
-  if (paramsPromiseRef.current === null) {
-    const raw = useParams() as Record<string, string | string[]> | Promise<Record<string, string | string[]> | undefined>;
-    paramsPromiseRef.current = raw instanceof Promise ? raw : Promise.resolve(raw);
-  }
-  const params = use(paramsPromiseRef.current);
+  const params = useParams() as Record<string, string | string[]>;
   const appID = typeof params?.appID === 'string' ? params.appID : '';
   return (
     <AppChangesProvider appID={appID}>

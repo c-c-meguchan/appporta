@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { AppPageHeader } from '@/components/AppPageHeader';
 import { Tooltip } from '@/components/Tooltip';
@@ -60,18 +60,13 @@ const DELETE_ITEM_CLASS =
   'flex w-full items-center gap-2 px-3 py-2 text-xs text-red-600 transition hover:bg-zinc-50 dark:text-red-400 dark:hover:bg-zinc-800';
 
 export default function AppTestimonialPage() {
-  const paramsPromiseRef = useRef<Promise<Record<string, string | string[]> | undefined> | null>(null);
-  if (paramsPromiseRef.current === null) {
-    const raw = useParams() as Record<string, string | string[]> | Promise<Record<string, string | string[]> | undefined>;
-    paramsPromiseRef.current = raw instanceof Promise ? raw : Promise.resolve(raw);
-  }
-  const params = use(paramsPromiseRef.current);
+  // クライアントコンポーネントでは useParams は同期オブジェクトとして扱う
+  const params = useParams() as Record<string, string | string[]>;
   const appID = typeof params?.appID === 'string' ? params.appID : '';
   const { isPublished, publishing, loading: headerLoading, onPublish, onUnpublish } = useAppHeaderData(appID);
   const appChanges = useAppChanges();
 
   const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
-  const [readReviewIds, setReadReviewIds] = useState<Set<string>>(new Set());
   /** 新着を一件ずつ表示するキュー（先頭から順に表示） */
   const [newItemQueue, setNewItemQueue] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -96,25 +91,26 @@ export default function AppTestimonialPage() {
   const fetchTestimonials = useCallback(async () => {
     if (!appID) return;
     setLoading(true);
-    const [reviewsRes, readSet] = await Promise.all([
-      supabase
-        .from('reviews')
-        .select('id, user_icon_url, user_name, content, secret_message, is_public, created_at')
-        .eq('app_id', appID)
-        .order('created_at', { ascending: false }),
-      fetchReadState(),
-    ]);
+    try {
+      const [reviewsRes, readSet] = await Promise.all([
+        supabase
+          .from('reviews')
+          .select('id, user_icon_url, user_name, content, secret_message, is_public, created_at')
+          .eq('app_id', appID)
+          .order('created_at', { ascending: false }),
+        fetchReadState(),
+      ]);
 
-    const { data: list, error } = reviewsRes;
-    if (error) {
-      console.error(error);
-      setTestimonials([]);
-      setReadReviewIds(new Set());
-      appChanges?.setTestimonialsHasNew(false);
-    } else {
+      const { data: list, error } = reviewsRes;
+      if (error) {
+        console.error(error);
+        setTestimonials([]);
+        appChanges?.setTestimonialsHasNew(false);
+        return;
+      }
+
       const items = list ?? [];
       setTestimonials(items);
-      setReadReviewIds(readSet);
       const hasNew = items.some((t) => !readSet.has(t.id));
       appChanges?.setTestimonialsHasNew(hasNew);
       const unreadIds = items.filter((t) => !readSet.has(t.id)).map((t) => t.id);
@@ -122,31 +118,14 @@ export default function AppTestimonialPage() {
         setNewItemQueue(unreadIds);
         hasFilledNewItemQueueRef.current = true;
       }
+    } catch (e) {
+      console.error(e);
+      setTestimonials([]);
+      appChanges?.setTestimonialsHasNew(false);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, [appID, fetchReadState, appChanges]);
-
-  /** 一覧を閉じたとき（ページ離脱時）に表示中の全件を既読にする */
-  const testimonialsRef = useRef<Testimonial[]>([]);
-  const appIDRef = useRef<string>(appID);
-  testimonialsRef.current = testimonials;
-  appIDRef.current = appID;
-
-  useEffect(() => {
-    return () => {
-      const list = testimonialsRef.current;
-      const id = appIDRef.current;
-      if (!id || list.length === 0) return;
-      list.forEach((t) => {
-        void supabase
-          .from('review_reads')
-          .upsert(
-            { app_id: id, review_id: t.id, read_at: new Date().toISOString() },
-            { onConflict: 'app_id,review_id' }
-          );
-      });
-    };
-  }, []);
 
   useEffect(() => {
     fetchTestimonials();
@@ -203,15 +182,18 @@ export default function AppTestimonialPage() {
   const newItemCurrent = newItemQueue.length > 0 ? testimonials.find((t) => t.id === newItemQueue[0]) ?? null : null;
 
   const markReviewAsReadAndNext = useCallback(
-    (reviewId: string) => {
+    async (reviewId: string) => {
       if (!appID) return;
-      void supabase
+      const { error } = await supabase
         .from('review_reads')
         .upsert(
           { app_id: appID, review_id: reviewId, read_at: new Date().toISOString() },
           { onConflict: 'app_id,review_id' }
         );
-      setReadReviewIds((prev) => new Set(prev).add(reviewId));
+      if (error) {
+        console.error(error);
+        return;
+      }
       setNewItemQueue((prev) => {
         const next = prev.slice(1);
         appChanges?.setTestimonialsHasNew(next.length > 0);
@@ -224,19 +206,27 @@ export default function AppTestimonialPage() {
   const handleNewItemPublish = useCallback(async () => {
     if (!newItemCurrent || !appID) return;
     const id = newItemCurrent.id;
-    // 掲載操作前に既読＋キュー更新して、このアイテムを新着から外す
-    markReviewAsReadAndNext(id);
+
+    // 1. まずローカルの一覧状態を即時に掲載状態へ（ピンON）
+    setTestimonials((prev) => prev.map((t) => (t.id === id ? { ...t, is_public: true } : t)));
+    // 2. 「未反映の変更」としてコンテキストにも載せる（ヘッダーの更新ボタン用）
+    appChanges?.stageTestimonialChange(id, true);
+    // 3. 既読＋新着キュー更新（ここでモーダルが次のアイテムに進む）
+    await markReviewAsReadAndNext(id);
+    // 4. Supabase 上の reviews.is_public を更新
     const { error } = await supabase.from('reviews').update({ is_public: true }).eq('id', id);
     if (error) {
       console.error(error);
+      // 失敗した場合はローカル状態を元に戻す
+      setTestimonials((prev) => prev.map((t) => (t.id === id ? { ...t, is_public: false } : t)));
+      appChanges?.unstageTestimonialChange(id);
       return;
     }
-    setTestimonials((prev) => prev.map((t) => (t.id === id ? { ...t, is_public: true } : t)));
-  }, [newItemCurrent, appID, markReviewAsReadAndNext]);
+  }, [newItemCurrent, appID, appChanges, markReviewAsReadAndNext]);
 
-  const handleNewItemReadAndNext = useCallback(() => {
+  const handleNewItemReadAndNext = useCallback(async () => {
     if (!newItemCurrent) return;
-    markReviewAsReadAndNext(newItemCurrent.id);
+    await markReviewAsReadAndNext(newItemCurrent.id);
   }, [newItemCurrent, markReviewAsReadAndNext]);
 
   return (
@@ -276,18 +266,12 @@ export default function AppTestimonialPage() {
                 {testimonials.map((t) => {
                   const isPublic = getEffectivePublic(t);
                   const hasPendingChange = pendingChanges.has(t.id);
-                  const isNew = !readReviewIds.has(t.id);
                   return (
                     <div
                       key={t.id}
                       className="relative rounded-xl border-[0.7px] border-zinc-200 bg-white px-3 py-5 transition hover:border-zinc-300 hover:shadow-sm dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-700"
                     >
                       <div className="absolute right-1.5 top-1.5 flex items-center">
-                        {isNew && (
-                          <span className="mr-1 rounded-full bg-sky-500 px-1.5 py-0.5 text-[10px] font-semibold text-white">
-                            新着
-                          </span>
-                        )}
                         <Tooltip content={isPublic ? '公開ページから取り下げ' : '公開ページに掲載'}>
                           <button
                             type="button"
@@ -464,11 +448,6 @@ export default function AppTestimonialPage() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="absolute right-3 top-3 flex items-center gap-1">
-              {!readReviewIds.has(expandedItem.id) && (
-                <span className="rounded-full bg-sky-500 px-2 py-0.5 text-xs font-semibold text-white">
-                  新着
-                </span>
-              )}
               <Tooltip content={getEffectivePublic(expandedItem) ? '公開ページから取り下げ' : '公開ページに掲載'}>
                 <button
                   type="button"
