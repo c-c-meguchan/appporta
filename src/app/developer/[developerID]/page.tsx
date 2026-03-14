@@ -1,11 +1,13 @@
 'use client';
 
-import { useParams } from 'next/navigation';
+import { use } from 'react';
 import { useState, useEffect } from 'react';
 
-export default function PublicDeveloperPage() {
-  const params = useParams();
-  const developerID = typeof params.developerID === 'string' ? params.developerID : '';
+type PageProps = { params: Promise<{ developerID?: string }> };
+
+export default function PublicDeveloperPage({ params }: PageProps) {
+  const resolved = use(params);
+  const developerID = typeof resolved.developerID === 'string' ? resolved.developerID : '';
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {

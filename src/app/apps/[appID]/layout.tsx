@@ -1,13 +1,12 @@
 'use client';
 
-import { useParams } from 'next/navigation';
+import { use } from 'react';
 import { AppChangesProvider, useAppChanges } from '@/context/AppChangesContext';
 import { getMainOriginClient } from '@/lib/constants';
 
-function UrlChangeConfirmModal() {
-  // Next.js のクライアントコンポーネントでは useParams は同期オブジェクトとして扱う
-  const params = useParams() as Record<string, string | string[]>;
-  const appID = typeof params?.appID === 'string' ? params.appID : '';
+function UrlChangeConfirmModal({ params }: { params: Promise<{ appID?: string }> }) {
+  const resolved = use(params);
+  const appID = typeof resolved?.appID === 'string' ? resolved.appID : '';
   const ctx = useAppChanges();
   if (!ctx) return null;
   const { showUrlConfirm, setShowUrlConfirm, applyUrlChange, applyingUrl, pendingAppId } = ctx;
@@ -99,14 +98,16 @@ function UrlChangeConfirmModal() {
 
 export default function AppLayout({
   children,
+  params,
 }: {
   children: React.ReactNode;
+  params: Promise<{ appID?: string }>;
 }) {
-  const params = useParams() as Record<string, string | string[]>;
-  const appID = typeof params?.appID === 'string' ? params.appID : '';
+  const resolved = use(params);
+  const appID = typeof resolved?.appID === 'string' ? resolved.appID : '';
   return (
     <AppChangesProvider appID={appID}>
-      <UrlChangeConfirmModal />
+      <UrlChangeConfirmModal params={params} />
       {children}
     </AppChangesProvider>
   );

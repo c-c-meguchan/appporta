@@ -1,8 +1,19 @@
 'use client';
 
-import { useEffect, useState, Suspense } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { use, useEffect, useState, Suspense } from 'react';
+import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+
+type SearchParamsPromise = Promise<{ [key: string]: string | string[] | undefined }>;
+
+function getParam(
+  resolved: { [key: string]: string | string[] | undefined },
+  key: string
+): string | null {
+  const v = resolved[key];
+  if (v == null) return null;
+  return Array.isArray(v) ? v[0] ?? null : v;
+}
 
 /** ログイン後: next 指定があればそれに従い、なければアプリ有無で /welcome か / を返す */
 async function resolveRedirectTarget(
@@ -34,18 +45,18 @@ async function resolveRedirectTarget(
   return '/apps';
 }
 
-function AuthCallbackInner() {
+function AuthCallbackInner({ searchParams }: { searchParams: SearchParamsPromise }) {
   const router = useRouter();
-  const searchParams = useSearchParams();
+  const resolved = use(searchParams);
   const [status, setStatus] = useState<'exchanging' | 'redirecting' | 'error'>('exchanging');
 
   useEffect(() => {
     let cancelled = false;
-    const nextParam = searchParams.get('next');
-    const appId = searchParams.get('app_id');
+    const nextParam = getParam(resolved, 'next');
+    const appId = getParam(resolved, 'app_id');
 
     async function run() {
-      const code = searchParams.get('code');
+      const code = getParam(resolved, 'code');
 
       if (code) {
         const { error } = await supabase.auth.exchangeCodeForSession(code);
@@ -76,7 +87,7 @@ function AuthCallbackInner() {
 
     run();
     return () => { cancelled = true; };
-  }, [router, searchParams]);
+  }, [router, resolved]);
 
   if (status === 'error') {
     return (
@@ -98,7 +109,9 @@ function AuthCallbackInner() {
   );
 }
 
-export default function AuthCallbackPage() {
+type PageProps = { searchParams: SearchParamsPromise };
+
+export default function AuthCallbackPage({ searchParams }: PageProps) {
   return (
     <Suspense
       fallback={
@@ -107,7 +120,7 @@ export default function AuthCallbackPage() {
         </div>
       }
     >
-      <AuthCallbackInner />
+      <AuthCallbackInner searchParams={searchParams} />
     </Suspense>
   );
 }

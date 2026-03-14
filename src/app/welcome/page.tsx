@@ -1,16 +1,24 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { use, useState, useEffect, Suspense } from 'react';
+import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
 const APP_ID_REGEX = /^[a-z0-9-]+$/;
 const DEVELOPER_ID_REGEX = /^[a-z0-9_-]+$/;
 
-function WelcomeForm() {
+type SearchParamsPromise = Promise<{ [key: string]: string | string[] | undefined }>;
+
+function getParam(resolved: { [key: string]: string | string[] | undefined }, key: string): string {
+  const v = resolved[key];
+  if (v == null) return '';
+  return Array.isArray(v) ? v[0] ?? '' : v;
+}
+
+function WelcomeForm({ searchParams }: { searchParams: SearchParamsPromise }) {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const appIdFromQuery = searchParams.get('app_id') ?? '';
+  const resolved = use(searchParams);
+  const appIdFromQuery = getParam(resolved, 'app_id');
 
   const [appId, setAppId] = useState(appIdFromQuery);
   const [developerId, setDeveloperId] = useState('');
@@ -151,10 +159,10 @@ function WelcomeForm() {
   );
 }
 
-export default function WelcomePage() {
+export default function WelcomePage({ searchParams }: { searchParams: SearchParamsPromise }) {
   return (
     <Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-black">読み込み中...</div>}>
-      <WelcomeForm />
+      <WelcomeForm searchParams={searchParams} />
     </Suspense>
   );
 }

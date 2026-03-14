@@ -1,12 +1,14 @@
 'use client';
 
-import { useParams } from 'next/navigation';
+import { use } from 'react';
 import { AppPageHeader } from '@/components/AppPageHeader';
 import { useAppHeaderData } from '@/hooks/useAppHeaderData';
 
-export default function AppAnalyticsPage() {
-  const params = useParams();
-  const appID = typeof params.appID === 'string' ? params.appID : '';
+type PageProps = { params: Promise<{ appID?: string }> };
+
+export default function AppAnalyticsPage({ params }: PageProps) {
+  const resolved = use(params);
+  const appID = typeof resolved.appID === 'string' ? resolved.appID : '';
   const { isPublished, publishing, loading, appTitle, onPublish, onUnpublish } = useAppHeaderData(appID);
 
   return (

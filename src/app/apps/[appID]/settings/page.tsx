@@ -1,6 +1,6 @@
 'use client';
 
-import { useParams } from 'next/navigation';
+import { use } from 'react';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -53,9 +53,11 @@ function CheckIcon({ className }: { className?: string }) {
   );
 }
 
-export default function AppSettingsPage() {
-  const params = useParams();
-  const appID = typeof params.appID === 'string' ? params.appID : '';
+type PageProps = { params: Promise<{ appID?: string }> };
+
+export default function AppSettingsPage({ params }: PageProps) {
+  const resolved = use(params);
+  const appID = typeof resolved.appID === 'string' ? resolved.appID : '';
   const {
     isPublished,
     pendingAppId,

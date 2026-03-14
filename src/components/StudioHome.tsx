@@ -9,9 +9,19 @@ const APP_ID_REGEX = /^[a-z0-9-]+$/;
 
 type AppRow = { app_id: string; name: string | null };
 
+type StudioUser = {
+  id: string;
+  email?: string;
+  user_metadata?: { avatar_url?: string; full_name?: string; name?: string };
+  /** 表示用の名前（GitHub があれば GitHub 優先） */
+  profileName?: string;
+  /** 表示用アイコンURL（GitHub があれば GitHub 優先） */
+  fixedAvatarUrl?: string;
+};
+
 export default function StudioHome() {
   const router = useRouter();
-  const [user, setUser] = useState<{ id: string; email?: string; user_metadata?: { avatar_url?: string; full_name?: string; name?: string } } | null>(null);
+  const [user, setUser] = useState<StudioUser | null>(null);
   const [apps, setApps] = useState<AppRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [showNewModal, setShowNewModal] = useState(false);
@@ -109,10 +119,42 @@ export default function StudioHome() {
       }
 
       if (!cancelled) {
+        // GitHub 認証があれば GitHub の最新情報を優先して名前・アイコンを採用する。
+        const identities = (u as any).identities as { provider: string; identity_data?: Record<string, any> }[] | undefined;
+        const githubIdentity = identities?.find((i) => i.provider === 'github');
+
+        let fixedAvatarUrl: string | undefined;
+        let profileName: string | undefined;
+
+        if (githubIdentity) {
+          const data = githubIdentity.identity_data ?? {};
+          fixedAvatarUrl =
+            (data as any).avatar_url ||
+            (data as any).picture ||
+            (u.user_metadata as any)?.avatar_url ||
+            undefined;
+          profileName =
+            (data as any).name ||
+            (data as any).full_name ||
+            (data as any).user_name ||
+            (data as any).login ||
+            (u.user_metadata as any)?.full_name ||
+            (u.user_metadata as any)?.name ||
+            (u.email ?? undefined);
+        } else {
+          fixedAvatarUrl = (u.user_metadata as any)?.avatar_url || undefined;
+          profileName =
+            (u.user_metadata as any)?.full_name ||
+            (u.user_metadata as any)?.name ||
+            (u.email ?? undefined);
+        }
+
         setUser({
           id: u.id,
           email: u.email ?? undefined,
           user_metadata: u.user_metadata as { avatar_url?: string; full_name?: string; name?: string } | undefined,
+          profileName,
+          fixedAvatarUrl,
         });
       }
 
@@ -138,11 +180,12 @@ export default function StudioHome() {
   }, [router]);
 
   const displayName =
+    user?.profileName ||
     user?.user_metadata?.full_name ||
     user?.user_metadata?.name ||
     user?.email ||
     'ユーザー';
-  const avatarUrl = user?.user_metadata?.avatar_url;
+  const avatarUrl = user?.fixedAvatarUrl ?? user?.user_metadata?.avatar_url;
 
   if (loading || !user) {
     return (
@@ -274,18 +317,23 @@ export default function StudioHome() {
                   htmlFor="new-app-id"
                   className="mb-1 block text-xs font-medium text-zinc-800 dark:text-zinc-200"
                 >
-                  プロジェクトID
+                  appID
                 </label>
-                <input
-                  id="new-app-id"
-                  type="text"
-                  value={newAppId}
-                  onChange={(e) => setNewAppId(e.target.value)}
-                  placeholder="例: my-first-app"
-                  className="w-full rounded-lg bg-zinc-100 px-3 py-2 text-sm text-zinc-900 outline-none ring-0 transition placeholder:text-zinc-500 focus:bg-zinc-200 focus:ring-[0.7px] focus:ring-zinc-300 dark:bg-zinc-800 dark:text-zinc-50 dark:placeholder:text-zinc-400 dark:focus:bg-zinc-700 dark:focus:ring-zinc-600"
-                />
+                <div className="flex items-center gap-2 rounded-lg bg-zinc-100 px-3 py-2 text-sm text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+                  <span className="whitespace-nowrap text-xs text-zinc-500 dark:text-zinc-400">
+                    appporta.com/
+                  </span>
+                  <input
+                    id="new-app-id"
+                    type="text"
+                    value={newAppId}
+                    onChange={(e) => setNewAppId(e.target.value)}
+                    placeholder="your-app-id"
+                    className="min-w-0 flex-1 bg-transparent text-sm text-zinc-900 outline-none placeholder:text-zinc-400 dark:text-zinc-50 dark:placeholder:text-zinc-500"
+                  />
+                </div>
                 <p className="mt-1 text-[11px] text-zinc-500 dark:text-zinc-400">
-                  小文字英数字とハイフンのみ使用できます。
+                  appID は小文字英数字とハイフンのみ使用できます。
                 </p>
               </div>
               <div>
@@ -293,14 +341,14 @@ export default function StudioHome() {
                   htmlFor="new-app-name"
                   className="mb-1 block text-xs font-medium text-zinc-800 dark:text-zinc-200"
                 >
-                  プロジェクト名
+                  アプリ名
                 </label>
                 <input
                   id="new-app-name"
                   type="text"
                   value={newAppName}
                   onChange={(e) => setNewAppName(e.target.value)}
-                  placeholder="例: はじめてのプロジェクト"
+                  placeholder="正式名称を入力"
                   className="w-full rounded-lg bg-zinc-100 px-3 py-2 text-sm text-zinc-900 outline-none ring-0 transition placeholder:text-zinc-500 focus:bg-zinc-200 focus:ring-[0.7px] focus:ring-zinc-300 dark:bg-zinc-800 dark:text-zinc-50 dark:placeholder:text-zinc-400 dark:focus:bg-zinc-700 dark:focus:ring-zinc-600"
                 />
               </div>

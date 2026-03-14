@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { use } from 'react';
 import { AppPageHeader } from '@/components/AppPageHeader';
 import { Tooltip } from '@/components/Tooltip';
 import { useAppChanges } from '@/context/AppChangesContext';
@@ -59,11 +59,12 @@ const DROPDOWN_CLASS =
 const DELETE_ITEM_CLASS =
   'flex w-full items-center gap-2 px-3 py-2 text-xs text-red-600 transition hover:bg-zinc-50 dark:text-red-400 dark:hover:bg-zinc-800';
 
-export default function AppTestimonialPage() {
-  // クライアントコンポーネントでは useParams は同期オブジェクトとして扱う
-  const params = useParams() as Record<string, string | string[]>;
-  const appID = typeof params?.appID === 'string' ? params.appID : '';
-  const { isPublished, publishing, loading: headerLoading, onPublish, onUnpublish } = useAppHeaderData(appID);
+type PageProps = { params: Promise<{ appID?: string }> };
+
+export default function AppTestimonialPage({ params }: PageProps) {
+  const resolved = use(params);
+  const appID = typeof resolved?.appID === 'string' ? resolved.appID : '';
+  const { isPublished, appTitle, publishing, loading: headerLoading, onPublish, onUnpublish } = useAppHeaderData(appID);
   const appChanges = useAppChanges();
 
   const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
@@ -234,6 +235,7 @@ export default function AppTestimonialPage() {
       <AppPageHeader
         appID={appID}
         isPublished={isPublished}
+        appTitle={appTitle}
         onPublish={onPublish}
         onUnpublish={onUnpublish}
         publishing={publishing}

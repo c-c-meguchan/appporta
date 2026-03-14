@@ -1,6 +1,7 @@
 'use client';
 
-import { useParams, useRouter } from 'next/navigation';
+import { use } from 'react';
+import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { notFound } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
@@ -9,10 +10,12 @@ import { appRowToFormState } from '@/lib/app-page-data';
 import type { AppFormState } from '@/lib/app-edit-types';
 import { isReservedAppId } from '@/lib/constants';
 
-export default function PublicAppPage() {
-  const params = useParams();
+type PageProps = { params: Promise<{ appID?: string }> };
+
+export default function PublicAppPage({ params }: PageProps) {
+  const resolved = use(params);
   const router = useRouter();
-  const appID = typeof params.appID === 'string' ? params.appID : '';
+  const appID = typeof resolved.appID === 'string' ? resolved.appID : '';
 
   const [data, setData] = useState<AppFormState | null>(null);
   const [reviews, setReviews] = useState<ReviewItem[]>([]);

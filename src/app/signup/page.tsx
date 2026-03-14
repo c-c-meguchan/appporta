@@ -1,14 +1,16 @@
 'use client';
 
-import { useState, Suspense, useEffect } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { use, useState, Suspense, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 
-function SignupForm() {
+type SearchParamsPromise = Promise<{ [key: string]: string | string[] | undefined }>;
+
+function SignupForm({ searchParams }: { searchParams: SearchParamsPromise }) {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const appIdFromQuery = searchParams.get('app_id') ?? '';
+  const resolved = use(searchParams);
+  const appIdFromQuery = (resolved?.app_id && (Array.isArray(resolved.app_id) ? resolved.app_id[0] : resolved.app_id)) ?? '';
   const [loadingProvider, setLoadingProvider] = useState<null | 'google' | 'github'>(null);
   const [checking, setChecking] = useState(true);
 
@@ -88,10 +90,10 @@ function SignupForm() {
   );
 }
 
-export default function SignupPage() {
+export default function SignupPage({ searchParams }: { searchParams: SearchParamsPromise }) {
   return (
     <Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-black">読み込み中...</div>}>
-      <SignupForm />
+      <SignupForm searchParams={searchParams} />
     </Suspense>
   );
 }

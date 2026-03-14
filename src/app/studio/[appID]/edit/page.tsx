@@ -1,6 +1,7 @@
 'use client';
 
-import { useParams, useRouter } from 'next/navigation';
+import { use } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -206,10 +207,12 @@ function ImageUploadInput({ label, value, onChange, pathPrefix }: ImageUploadInp
   );
 }
 
-export default function StudioAppEditPage() {
-  const params = useParams();
+type PageProps = { params: Promise<{ appID?: string }> };
+
+export default function StudioAppEditPage({ params }: PageProps) {
+  const resolved = use(params);
   const router = useRouter();
-  const appID = typeof params.appID === 'string' ? params.appID : '';
+  const appID = typeof resolved.appID === 'string' ? resolved.appID : '';
 
   const [form, setForm] = useState<AppFormState>(defaultFormState);
   const [focusedSection, setFocusedSection] = useState<SectionId | null>(null);
