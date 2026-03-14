@@ -1,6 +1,7 @@
 'use client';
 
-import { useParams, useRouter } from 'next/navigation';
+import { use } from 'react';
+import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { AppPageView, type ReviewItem } from '@/components/app-page-view/AppPageView';
@@ -39,7 +40,7 @@ const VISIBILITY_KEYS: Record<SectionId, keyof AppFormState | null> = {
   footer: null,
 };
 
-function parseJsonArray(val: unknown, fallback: any[]): any[] {
+function parseJsonArray(val: unknown, fallback: unknown[]): unknown[] {
   if (Array.isArray(val)) return val;
   if (typeof val === 'string') {
     try {
@@ -54,22 +55,28 @@ function parseJsonArray(val: unknown, fallback: any[]): any[] {
 
 function parseReleaseNotes(val: unknown): ReleaseNote[] {
   const a = parseJsonArray(val, []);
-  return a.map((x: any) => ({
-    version: typeof x?.version === 'string' ? x.version : '',
-    body: typeof x?.body === 'string' ? x.body : '',
-    date: typeof x?.date === 'string' ? x.date : undefined,
-  }));
+  return a.map((x: unknown) => {
+    const item = x && typeof x === 'object' ? x as Record<string, unknown> : {};
+    return {
+      version: typeof item.version === 'string' ? item.version : '',
+      body: typeof item.body === 'string' ? item.body : '',
+      date: typeof item.date === 'string' ? item.date : undefined,
+    };
+  });
 }
 
 function parseFeaturedItems(val: unknown): FeaturedItem[] {
   const a = parseJsonArray(val, []);
-  return a.map((x: any) => ({
-    url: typeof x?.url === 'string' ? x.url : '',
-    note: typeof x?.note === 'string' ? x.note : '',
-    title: typeof x?.title === 'string' ? x.title : undefined,
-    description: typeof x?.description === 'string' ? x.description : undefined,
-    image_url: typeof x?.image_url === 'string' ? x.image_url : undefined,
-  }));
+  return a.map((x: unknown) => {
+    const item = x && typeof x === 'object' ? x as Record<string, unknown> : {};
+    return {
+      url: typeof item.url === 'string' ? item.url : '',
+      note: typeof item.note === 'string' ? item.note : '',
+      title: typeof item.title === 'string' ? item.title : undefined,
+      description: typeof item.description === 'string' ? item.description : undefined,
+      image_url: typeof item.image_url === 'string' ? item.image_url : undefined,
+    };
+  });
 }
 
 /** 価格をカンマ区切りで表示（保存値はカンマなし） */
@@ -88,10 +95,12 @@ function parsePriceInput(input: string): string {
   return match ? match[0] : '';
 }
 
-export default function StudioAppEditPage() {
-  const params = useParams();
+type PageProps = { params: Promise<{ appID?: string }> };
+
+export default function StudioAppEditPage({ params }: PageProps) {
+  const resolved = use(params);
   const router = useRouter();
-  const appID = typeof params.appID === 'string' ? params.appID : '';
+  const appID = typeof resolved.appID === 'string' ? resolved.appID : '';
 
   const [form, setForm] = useState<AppFormState>(defaultFormState);
   const [focusedSection, setFocusedSection] = useState<SectionId | null>(null);
