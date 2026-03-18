@@ -1,11 +1,41 @@
 'use client';
 
-import { use, useState, useEffect, Suspense } from 'react';
+import { use, useState, useEffect, useCallback, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import { validateAppIdSlug } from '@/lib/constants';
 
-const APP_ID_REGEX = /^[a-z0-9-]+$/;
 const DEVELOPER_ID_REGEX = /^[a-z0-9_-]+$/;
+
+function SpinnerIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      fill="none"
+      viewBox="0 0 24 24"
+      className={className}
+      aria-hidden
+    >
+      <circle
+        cx="12"
+        cy="12"
+        r="10"
+        stroke="currentColor"
+        strokeWidth="3"
+        strokeLinecap="round"
+        strokeDasharray="30 70"
+      />
+    </svg>
+  );
+}
+
+function CheckIcon({ className }: { className?: string }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden>
+      <path fillRule="evenodd" d="M19.916 4.626a.75.75 0 0 1 .208 1.04l-9 13.5a.75.75 0 0 1-1.154.114l-6-6a.75.75 0 0 1 1.06-1.06l5.353 5.353 8.493-12.74a.75.75 0 0 1 1.04-.207Z" clipRule="evenodd" />
+    </svg>
+  );
+}
 
 type SearchParamsPromise = Promise<{ [key: string]: string | string[] | undefined }>;
 
@@ -26,17 +56,54 @@ function WelcomeForm({ searchParams }: { searchParams: SearchParamsPromise }) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(false);
+  const [slugChecking, setSlugChecking] = useState(false);
+  const [slugAvailable, setSlugAvailable] = useState<boolean | null>(null);
+  const [appIdError, setAppIdError] = useState<string | null>(null);
+
+  const checkSlugAvailability = useCallback(async (trimmed: string) => {
+    setSlugChecking(true);
+    setAppIdError(null);
+    const { data: existing } = await supabase
+      .from('apps')
+      .select('app_id')
+      .eq('app_id', trimmed)
+      .maybeSingle();
+    setSlugChecking(false);
+    const available = !existing;
+    setSlugAvailable(available);
+    if (!available) {
+      setAppIdError('このアプリIDはすでに使用されています。別のIDを選んでください。');
+    }
+  }, []);
 
   useEffect(() => {
     setAppId((prev) => appIdFromQuery || prev);
   }, [appIdFromQuery]);
 
+  useEffect(() => {
+    const trimmed = appId.trim().toLowerCase();
+    const validation = validateAppIdSlug(trimmed);
+    if (!validation.valid) {
+      setSlugAvailable(null);
+      setAppIdError(trimmed.length === 0 ? null : validation.error);
+      return;
+    }
+    setAppIdError(null);
+    const t = setTimeout(() => {
+      checkSlugAvailability(trimmed);
+    }, 400);
+    return () => clearTimeout(t);
+  }, [appId, checkSlugAvailability]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setAppIdError(null);
 
-    if (!APP_ID_REGEX.test(appId)) {
-      setError('アプリIDは小文字英数字とハイフンのみ使用できます。');
+    const appIdNormalized = appId.trim().toLowerCase();
+    const appIdValidation = validateAppIdSlug(appIdNormalized);
+    if (!appIdValidation.valid) {
+      setAppIdError(appIdValidation.error);
       return;
     }
     if (!DEVELOPER_ID_REGEX.test(developerId)) {
@@ -45,6 +112,12 @@ function WelcomeForm({ searchParams }: { searchParams: SearchParamsPromise }) {
     }
     if (!appName.trim()) {
       setError('アプリ名を入力してください。');
+      return;
+    }
+
+    const { data: existingApp } = await supabase.from('apps').select('app_id').eq('app_id', appIdNormalized).maybeSingle();
+    if (existingApp) {
+      setAppIdError('このアプリIDはすでに使用されています。別のIDを選んでください。');
       return;
     }
 
@@ -59,17 +132,9 @@ function WelcomeForm({ searchParams }: { searchParams: SearchParamsPromise }) {
         return;
       }
 
-      const { data: existingApp } = await supabase.from('apps').select('app_id').eq('app_id', appId).maybeSingle();
-      if (existingApp) {
-        setError('このアプリIDはすでに使用されています。別のIDを選んでください。');
-        setChecking(false);
-        setLoading(false);
-        return;
-      }
-
       const { error: insertError } = await supabase.from('apps').insert({
         user_id: user.id,
-        app_id: appId,
+        app_id: appIdNormalized,
         name: appName.trim(),
       });
 
@@ -81,7 +146,7 @@ function WelcomeForm({ searchParams }: { searchParams: SearchParamsPromise }) {
         return;
       }
 
-      router.push(`/apps/${appId}/edit`);
+      router.push(`/apps/${appIdNormalized}/edit`);
     } finally {
       setChecking(false);
       setLoading(false);
@@ -102,17 +167,33 @@ function WelcomeForm({ searchParams }: { searchParams: SearchParamsPromise }) {
             <label htmlFor="app-id" className="mb-1 block text-sm font-medium text-zinc-800 dark:text-zinc-200">
               アプリID
             </label>
-            <input
-              id="app-id"
-              type="text"
-              value={appId}
-              onChange={(e) => setAppId(e.target.value)}
-              placeholder="例: my-first-app"
-              className="w-full rounded-lg bg-zinc-100 px-3 py-2 text-sm text-zinc-900 outline-none ring-0 transition placeholder:text-zinc-500 focus:bg-zinc-200 focus:ring-[0.7px] focus:ring-zinc-300 dark:bg-zinc-800 dark:text-zinc-50 dark:placeholder:text-zinc-400 dark:focus:bg-zinc-700 dark:focus:ring-zinc-600"
-            />
-            <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-              小文字英数字とハイフンのみ。公開URLは appporta.com/{appId || '...'} になります。
-            </p>
+            <div className="relative flex items-center">
+              <input
+                id="app-id"
+                type="text"
+                value={appId}
+                onChange={(e) => {
+                  setAppId(e.target.value.toLowerCase());
+                  setSlugAvailable(null);
+                  setAppIdError(null);
+                }}
+                placeholder="例: my-first-app"
+                className="w-full rounded-lg bg-zinc-100 py-2 pl-3 pr-8 text-sm text-zinc-900 outline-none ring-0 transition placeholder:text-zinc-500 focus:bg-zinc-200 focus:ring-[0.7px] focus:ring-zinc-300 dark:bg-zinc-800 dark:text-zinc-50 dark:placeholder:text-zinc-400 dark:focus:bg-zinc-700 dark:focus:ring-zinc-600"
+              />
+              <span className="pointer-events-none absolute right-2 flex h-5 w-5 items-center justify-center text-zinc-400 dark:text-zinc-500">
+                {slugChecking && (
+                  <SpinnerIcon className="h-5 w-5 animate-spin" />
+                )}
+                {!slugChecking && slugAvailable === true && (
+                  <CheckIcon className="h-5 w-5 text-emerald-500 dark:text-emerald-400" />
+                )}
+              </span>
+            </div>
+            {appIdError && (
+              <p className="mt-1 text-xs text-red-500 dark:text-red-400">
+                {appIdError}
+              </p>
+            )}
           </div>
           <div>
             <label htmlFor="developer-id" className="mb-1 block text-sm font-medium text-zinc-800 dark:text-zinc-200">

@@ -64,6 +64,7 @@ export default function AppSettingsPage({ params }: PageProps) {
     appTitle,
     publishing,
     loading,
+    publishedCount,
     onPublish,
     onUnpublish,
     refetch: refetchHeader,
@@ -232,6 +233,7 @@ export default function AppSettingsPage({ params }: PageProps) {
         appID={appID}
         isPublished={isPublished}
         appTitle={appTitle}
+        publishedCount={publishedCount}
         onPublish={onPublish}
         onUnpublish={onUnpublish}
         publishing={publishing}

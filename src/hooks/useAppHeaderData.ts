@@ -10,21 +10,36 @@ export function useAppHeaderData(appID: string) {
   const [publishing, setPublishing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [appTitle, setAppTitle] = useState<string | undefined>(undefined);
+  const [publishedCount, setPublishedCount] = useState(0);
 
   const fetchApp = useCallback(async () => {
     if (!appID) return;
-    const { data, error } = await supabase
-      .from('apps')
-      .select('name, is_published, pending_app_id')
-      .eq('app_id', appID)
-      .maybeSingle();
+    setLoading(true);
+    const [
+      { data: { user } },
+      { data: appData, error },
+    ] = await Promise.all([
+      supabase.auth.getUser(),
+      supabase.from('apps').select('name, is_published, pending_app_id').eq('app_id', appID).maybeSingle(),
+    ]);
     if (error) {
       setLoading(false);
       return;
     }
-    setIsPublished(Boolean(data?.is_published));
-    setPendingAppId(data?.pending_app_id ?? null);
-    setAppTitle(data?.name ?? undefined);
+    setIsPublished(Boolean(appData?.is_published));
+    setPendingAppId(appData?.pending_app_id ?? null);
+    setAppTitle(appData?.name ?? undefined);
+
+    if (user) {
+      const { count } = await supabase
+        .from('apps')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('is_published', true);
+      setPublishedCount(count ?? 0);
+    } else {
+      setPublishedCount(0);
+    }
     setLoading(false);
   }, [appID]);
 
@@ -34,7 +49,10 @@ export function useAppHeaderData(appID: string) {
 
   const onPublish = useCallback(async () => {
     setPublishing(true);
-    const { error } = await supabase.from('apps').update({ is_published: true }).eq('app_id', appID);
+    const { error } = await supabase
+      .from('apps')
+      .update({ is_published: true, last_reflected_at: new Date().toISOString() })
+      .eq('app_id', appID);
     if (!error) setIsPublished(true);
     setPublishing(false);
   }, [appID]);
@@ -46,5 +64,5 @@ export function useAppHeaderData(appID: string) {
     setPublishing(false);
   }, [appID]);
 
-  return { isPublished, pendingAppId, appTitle, publishing, loading, onPublish, onUnpublish, refetch: fetchApp };
+  return { isPublished, pendingAppId, appTitle, publishing, loading, publishedCount, onPublish, onUnpublish, refetch: fetchApp };
 }

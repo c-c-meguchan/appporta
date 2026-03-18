@@ -9,7 +9,7 @@ type PageProps = { params: Promise<{ appID?: string }> };
 export default function AppAnalyticsPage({ params }: PageProps) {
   const resolved = use(params);
   const appID = typeof resolved.appID === 'string' ? resolved.appID : '';
-  const { isPublished, publishing, loading, appTitle, onPublish, onUnpublish } = useAppHeaderData(appID);
+  const { isPublished, publishing, loading, appTitle, publishedCount, onPublish, onUnpublish } = useAppHeaderData(appID);
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950">
@@ -17,6 +17,7 @@ export default function AppAnalyticsPage({ params }: PageProps) {
         appID={appID}
         isPublished={isPublished}
         appTitle={appTitle}
+        publishedCount={publishedCount}
         onPublish={onPublish}
         onUnpublish={onUnpublish}
         publishing={publishing}

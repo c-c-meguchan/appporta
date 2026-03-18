@@ -64,7 +64,7 @@ type PageProps = { params: Promise<{ appID?: string }> };
 export default function AppTestimonialPage({ params }: PageProps) {
   const resolved = use(params);
   const appID = typeof resolved?.appID === 'string' ? resolved.appID : '';
-  const { isPublished, appTitle, publishing, loading: headerLoading, onPublish, onUnpublish } = useAppHeaderData(appID);
+  const { isPublished, appTitle, publishing, loading: headerLoading, publishedCount, onPublish, onUnpublish } = useAppHeaderData(appID);
   const appChanges = useAppChanges();
 
   const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
@@ -236,6 +236,7 @@ export default function AppTestimonialPage({ params }: PageProps) {
         appID={appID}
         isPublished={isPublished}
         appTitle={appTitle}
+        publishedCount={publishedCount}
         onPublish={onPublish}
         onUnpublish={onUnpublish}
         publishing={publishing}

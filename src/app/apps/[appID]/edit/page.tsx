@@ -9,6 +9,7 @@ import { AppPageHeader } from '@/components/AppPageHeader';
 import { ImageUploadInput } from '@/components/ImageUploadInput';
 import { Tooltip } from '@/components/Tooltip';
 import { useAppChanges } from '@/context/AppChangesContext';
+import { useAppHeaderData } from '@/hooks/useAppHeaderData';
 import { type AppFormState, type ReleaseNote, type SectionId, defaultFormState, SECTIONS, type FeaturedItem, parseBmcButtonConfig, parseBmcScriptTag } from '@/lib/app-edit-types';
 
 const INPUT_CLASS =
@@ -95,6 +96,54 @@ function parsePriceInput(input: string): string {
   return match ? match[0] : '';
 }
 
+/** ドラフト用: JSON を AppFormState に正規化（不足フィールドは defaultFormState で補う） */
+function parseDraftForm(raw: unknown): AppFormState {
+  const o = raw && typeof raw === 'object' ? raw as Record<string, unknown> : {};
+  return {
+    ...defaultFormState,
+    name: String(o.name ?? defaultFormState.name),
+    catch_copy: String(o.catch_copy ?? defaultFormState.catch_copy),
+    icon_url: String(o.icon_url ?? defaultFormState.icon_url),
+    button_label: String(o.button_label ?? defaultFormState.button_label),
+    button_label_type: (o.button_label_type === 'price' ? 'price' : 'download') as 'download' | 'price',
+    price_currency: String(o.price_currency ?? defaultFormState.price_currency),
+    price_value: String(o.price_value ?? defaultFormState.price_value),
+    primary_link: String(o.primary_link ?? defaultFormState.primary_link),
+    os_support: String(o.os_support ?? defaultFormState.os_support),
+    apple_silicon: Boolean(o.apple_silicon !== false),
+    file_size: String(o.file_size ?? defaultFormState.file_size),
+    version_visible: Boolean(o.version_visible),
+    version_number: String(o.version_number ?? defaultFormState.version_number),
+    release_notes: parseReleaseNotes(o.release_notes),
+    video_visible: Boolean(o.video_visible),
+    video_url: String(o.video_url ?? defaultFormState.video_url),
+    gallery_visible: Boolean(o.gallery_visible),
+    gallery_image_urls: parseJsonArray(o.gallery_image_urls, []).map(String),
+    free_text_visible: Boolean(o.free_text_visible),
+    free_text_image_url: String(o.free_text_image_url ?? defaultFormState.free_text_image_url),
+    free_text_markdown: String(o.free_text_markdown ?? defaultFormState.free_text_markdown),
+    users_voice_visible: Boolean(o.users_voice_visible),
+    users_voice_show_post_button: Boolean(o.users_voice_show_post_button !== false),
+    users_voice_display_order: parseJsonArray(o.users_voice_display_order, []).map(String),
+    featured_visible: Boolean(o.featured_visible),
+    featured_items: parseFeaturedItems(o.featured_items),
+    inquiry_visible: Boolean(o.inquiry_visible),
+    inquiry_url: String(o.inquiry_url ?? defaultFormState.inquiry_url),
+    developer_icon_url: String(o.developer_icon_url ?? defaultFormState.developer_icon_url),
+    developer_name: String(o.developer_name ?? defaultFormState.developer_name),
+    developer_bio: String(o.developer_bio ?? defaultFormState.developer_bio),
+    developer_github: String(o.developer_github ?? defaultFormState.developer_github),
+    developer_x: String(o.developer_x ?? defaultFormState.developer_x),
+    developer_contact_url: String(o.developer_contact_url ?? defaultFormState.developer_contact_url),
+    support_visible: Boolean(o.support_visible),
+    buy_me_a_coffee_url: String(o.buy_me_a_coffee_url ?? defaultFormState.buy_me_a_coffee_url),
+    bmc_button_config: parseBmcButtonConfig(o.bmc_button_config),
+    meta_title: String(o.meta_title ?? defaultFormState.meta_title),
+    meta_description: String(o.meta_description ?? defaultFormState.meta_description),
+    meta_cover_image_url: String(o.meta_cover_image_url ?? defaultFormState.meta_cover_image_url),
+  };
+}
+
 type PageProps = { params: Promise<{ appID?: string }> };
 
 export default function StudioAppEditPage({ params }: PageProps) {
@@ -115,6 +164,7 @@ export default function StudioAppEditPage({ params }: PageProps) {
   const [isPublished, setIsPublished] = useState(false);
   const [allReviews, setAllReviews] = useState<(ReviewItem & { is_public: boolean })[]>([]);
   const appChanges = useAppChanges();
+  const { publishedCount } = useAppHeaderData(appID);
 
   useEffect(() => {
     if (dirty) appChanges?.setEditDirty(true);
@@ -146,11 +196,13 @@ export default function StudioAppEditPage({ params }: PageProps) {
     if (!appID) return;
     setLoading(true);
     setError(null);
-    const { data, error: fetchError } = await supabase
-      .from('apps')
-      .select('*')
-      .eq('app_id', appID)
-      .maybeSingle();
+    const [
+      { data, error: fetchError },
+      { data: draftRow },
+    ] = await Promise.all([
+      supabase.from('apps').select('*').eq('app_id', appID).maybeSingle(),
+      supabase.from('app_edit_drafts').select('draft_data').eq('app_id', appID).maybeSingle(),
+    ]);
 
     if (fetchError) {
       console.error(fetchError);
@@ -165,7 +217,7 @@ export default function StudioAppEditPage({ params }: PageProps) {
     }
 
     const r = data as Record<string, unknown>;
-    setForm({
+    const baseForm: AppFormState = {
       name: String(r.name ?? ''),
       catch_copy: String(r.catch_copy ?? ''),
       icon_url: String(r.icon_url ?? ''),
@@ -206,14 +258,17 @@ export default function StudioAppEditPage({ params }: PageProps) {
       meta_title: String(r.meta_title ?? ''),
       meta_description: String(r.meta_description ?? ''),
       meta_cover_image_url: String(r.meta_cover_image_url ?? ''),
-    });
-    if (parseBmcButtonConfig(r.bmc_button_config)) {
-      setBmcInputMode('code');
-    }
+    };
+    const formToUse = draftRow?.draft_data != null ? parseDraftForm(draftRow.draft_data) : baseForm;
+    setForm(formToUse);
+    setBmcInputMode(formToUse.bmc_button_config ? 'code' : 'url');
     setIsPublished(Boolean(r.is_published));
+    if (draftRow?.draft_data != null) {
+      appChanges?.setEditDirty(true);
+    }
     setInitialized(true);
     setLoading(false);
-  }, [appID]);
+  }, [appID, appChanges]);
 
   useEffect(() => {
     fetchApp();
@@ -250,7 +305,27 @@ export default function StudioAppEditPage({ params }: PageProps) {
     });
   }, [allReviews, pendingChanges]);
 
+  /** 変更差分をドラフトに即時保存（プロジェクト離脱後も保持）。「更新」で apps に反映するまで未反映のまま。 */
+  const saveDraft = useCallback(async () => {
+    if (!appID) return;
+    const draftData = { ...form };
+    const { error: draftError } = await supabase
+      .from('app_edit_drafts')
+      .upsert(
+        { app_id: appID, draft_data: draftData, updated_at: new Date().toISOString() },
+        { onConflict: 'app_id' }
+      );
+    if (draftError) {
+      console.error(draftError);
+      setError('変更の保存に失敗しました。');
+      return;
+    }
+    appChanges?.setEditDirty(true);
+  }, [appID, form, appChanges]);
+
+  /** ドラフトを apps に反映し、ドラフトを削除（ヘッダー「更新」で呼ばれる） */
   const handleSave = useCallback(async () => {
+    if (!appID) return;
     setSaving(true);
     setError(null);
     const payload = {
@@ -295,6 +370,7 @@ export default function StudioAppEditPage({ params }: PageProps) {
       meta_title: form.meta_title.trim() || null,
       meta_description: form.meta_description.trim() || null,
       meta_cover_image_url: form.meta_cover_image_url.trim() || null,
+      last_reflected_at: new Date().toISOString(),
     };
     const { error: updateError } = await supabase
       .from('apps')
@@ -302,33 +378,36 @@ export default function StudioAppEditPage({ params }: PageProps) {
       .eq('app_id', appID);
     if (updateError) {
       console.error(updateError);
-      setError('保存に失敗しました。');
+      setError('反映に失敗しました。');
+      setSaving(false);
+      return;
     }
+    await supabase.from('app_edit_drafts').delete().eq('app_id', appID);
+    appChanges?.setEditDirty(false);
     setSaving(false);
-  }, [appID, form, bmcInputMode]);
+  }, [appID, form, bmcInputMode, appChanges]);
 
-  // 自動保存（初期ロード後の変更のみ）
+  // 編集内容をドラフトに自動保存（800ms デバウンス）。未反映の変更として保持する。
   useEffect(() => {
     if (!initialized || !dirty) return;
     const timer = setTimeout(() => {
-      void handleSave();
+      void saveDraft();
       setDirty(false);
     }, 800);
     return () => clearTimeout(timer);
-  }, [initialized, dirty, handleSave]);
+  }, [initialized, dirty, saveDraft]);
 
-  /** ヘッダー「更新」用: 保存してから公開反映済みとして editDirty をクリア */
+  /** ヘッダー「更新」用: ドラフトを apps に反映して editDirty をクリア */
   const handleHeaderUpdate = useCallback(async () => {
     await handleSave();
-    appChanges?.setEditDirty(false);
-  }, [handleSave, appChanges]);
+  }, [handleSave]);
 
   const handlePublish = useCallback(async () => {
     setPublishing(true);
     setError(null);
     const { error: updateError } = await supabase
       .from('apps')
-      .update({ is_published: true })
+      .update({ is_published: true, last_reflected_at: new Date().toISOString() })
       .eq('app_id', appID);
     if (updateError) {
       console.error(updateError);
@@ -390,6 +469,7 @@ export default function StudioAppEditPage({ params }: PageProps) {
         appID={appID}
         isPublished={isPublished}
         appTitle={form.name}
+        publishedCount={publishedCount}
         onSave={handleHeaderUpdate}
         onPublish={handlePublish}
         onUnpublish={handleUnpublish}

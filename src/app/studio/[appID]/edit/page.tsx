@@ -400,6 +400,7 @@ export default function StudioAppEditPage({ params }: PageProps) {
       meta_title: form.meta_title.trim() || null,
       meta_description: form.meta_description.trim() || null,
       meta_cover_image_url: form.meta_cover_image_url.trim() || null,
+      last_reflected_at: new Date().toISOString(),
     };
     const { error: updateError } = await supabase
       .from('apps')
@@ -427,7 +428,7 @@ export default function StudioAppEditPage({ params }: PageProps) {
     setError(null);
     const { error: updateError } = await supabase
       .from('apps')
-      .update({ is_published: true })
+      .update({ is_published: true, last_reflected_at: new Date().toISOString() })
       .eq('app_id', appID);
     if (updateError) {
       console.error(updateError);

@@ -1,10 +1,19 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { getMainOriginClient } from '@/lib/constants';
 import { useAppChanges } from '@/context/AppChangesContext';
 import { Tooltip } from '@/components/Tooltip';
+
+const FREE_PLAN_ANNOTATION = (
+  <>
+    Freeプランで公開できるのは１アカウントにつき１プロジェクトのみです。
+    <br />
+    近日提供予定のProプランに加入いただくと、公開数の上限がなくなります。
+  </>
+);
 
 function ChevronLeftIcon({ className }: { className?: string }) {
   return (
@@ -71,6 +80,8 @@ export type AppPageHeaderProps = {
   isPublished: boolean;
   /** アプリのタイトル（任意）。指定されていれば公開URLの上に表示されます。 */
   appTitle?: string;
+  /** 同一アカウントで公開中のプロジェクト数（Freeプラン制限の警告用） */
+  publishedCount?: number;
   onSave?: () => void | Promise<void>;
   onPublish?: () => void | Promise<void>;
   onUnpublish?: () => void | Promise<void>;
@@ -82,6 +93,7 @@ export function AppPageHeader({
   appID,
   isPublished,
   appTitle,
+  publishedCount = 0,
   onSave,
   onPublish,
   onUnpublish,
@@ -90,6 +102,7 @@ export function AppPageHeader({
 }: AppPageHeaderProps) {
   const pathname = usePathname();
   const changes = useAppChanges();
+  const [showPublishLimitDialog, setShowPublishLimitDialog] = useState(false);
   const editDirty = changes?.editDirty ?? false;
   const settingsUrlPending = changes?.settingsUrlPending ?? false;
   const testimonialsDirty = changes?.testimonialsDirty ?? false;
@@ -154,23 +167,18 @@ export function AppPageHeader({
         </>
       );
     }
-    if (hasAnyPending || onSave != null) {
-      return (
-        <button
-          type="button"
-          onClick={handleUpdateClick}
-          disabled={(!hasAnyPending && onSave == null) || isUpdating}
-          className={BUTTON_CLASS.primary}
-        >
-          {isUpdating ? '更新中...' : '更新'}
-        </button>
-      );
-    }
+    // 未公開: 「公開」のみ表示（編集は即時保存のため更新ボタンは出さない）
     if (onPublish != null) {
       return (
         <button
           type="button"
-          onClick={onPublish}
+          onClick={() => {
+            if (publishedCount >= 1) {
+              setShowPublishLimitDialog(true);
+              return;
+            }
+            onPublish();
+          }}
           disabled={publishing || saving}
           className={BUTTON_CLASS.primary}
         >
@@ -201,13 +209,14 @@ export function AppPageHeader({
               </div>
             )}
             <div className="flex items-center gap-2">
-              <span
-                className={`h-2 w-2 shrink-0 rounded-full ${
-                  isPublished ? 'bg-emerald-500 dark:bg-emerald-400' : 'bg-zinc-400 dark:bg-zinc-500'
-                }`}
-                title={isPublished ? '公開中' : '非公開'}
-                aria-hidden
-              />
+              <Tooltip content={isPublished ? '公開中' : '非公開'} placement="bottom">
+                <span
+                  className={`h-2 w-2 shrink-0 rounded-full ${
+                    isPublished ? 'bg-emerald-500 dark:bg-emerald-400' : 'bg-zinc-400 dark:bg-zinc-500'
+                  }`}
+                  aria-hidden
+                />
+              </Tooltip>
               <Link
                 href={publicUrl}
                 target="_blank"
@@ -222,6 +231,28 @@ export function AppPageHeader({
       </div>
 
       <div className="flex shrink-0 items-center gap-2">{renderActions()}</div>
+
+      {showPublishLimitDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+          <div className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-6 shadow-xl dark:border-zinc-700 dark:bg-zinc-900">
+            <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+              公開ページ数の上限に達しました
+            </h3>
+            <p className="mt-3 text-sm text-zinc-600 dark:text-zinc-400">
+              {FREE_PLAN_ANNOTATION}
+            </p>
+            <div className="mt-6">
+              <button
+                type="button"
+                onClick={() => setShowPublishLimitDialog(false)}
+                className="w-full rounded-lg border-[0.7px] border-zinc-300 bg-zinc-900 px-4 py-2.5 text-sm font-medium text-zinc-50 transition hover:bg-zinc-800 dark:border-zinc-600 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-200"
+              >
+                確認して閉じる
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <nav className="pointer-events-none absolute inset-x-0 flex justify-center" aria-label="アプリメニュー">
         <div className="pointer-events-auto flex items-center gap-0.5">

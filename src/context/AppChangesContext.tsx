@@ -123,7 +123,11 @@ export function AppChangesProvider({ appID, children }: AppChangesProviderProps)
 
       const rowRecord = row as Record<string, unknown>;
       const { app_id: _oldId, pending_app_id: _pending, id: _id, ...rest } = rowRecord;
-      const payload: Record<string, unknown> = { app_id: pending, pending_app_id: null };
+      const payload: Record<string, unknown> = {
+        app_id: pending,
+        pending_app_id: null,
+        last_reflected_at: new Date().toISOString(),
+      };
       for (const [key, value] of Object.entries(rest)) {
         if (value !== undefined) payload[key] = value;
       }
