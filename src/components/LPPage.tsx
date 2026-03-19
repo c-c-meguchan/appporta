@@ -16,12 +16,9 @@ export default function LPPage({
     e.preventDefault();
     const trimmed = appName.trim();
     if (!trimmed) return;
-    const appId = trimmed
-      .toLowerCase()
-      .replace(/\s+/g, '-')
-      .replace(/[^a-z0-9-]/g, '');
     const url = new URL('/signup', studioOrigin);
-    url.searchParams.set('app_id', appId || trimmed);
+    // トップで入力した文字列をそのまま welcome に渡す（welcome 側で検証・正規化する）
+    url.searchParams.set('app_id', trimmed);
     window.location.href = url.toString();
   };
 

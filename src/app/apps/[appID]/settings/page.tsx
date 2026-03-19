@@ -133,7 +133,7 @@ export default function AppSettingsPage({ params }: PageProps) {
       const available = !existing;
       setSlugAvailable(available);
       if (!available) {
-        setUrlSlugError('このアプリIDはすでに使用されています。別のIDを選んでください。');
+        setUrlSlugError('このappIDはすでに使用されています。別のIDを選んでください。');
       }
     },
     [appID]
@@ -181,7 +181,7 @@ export default function AppSettingsPage({ params }: PageProps) {
       .eq('app_id', trimmed)
       .maybeSingle();
     if (existing) {
-      setUrlSlugError('このアプリIDはすでに使用されています。別のIDを選んでください。');
+      setUrlSlugError('このappIDはすでに使用されています。別のIDを選んでください。');
       return;
     }
     setUrlSlugError(null);

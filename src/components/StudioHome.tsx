@@ -6,6 +6,14 @@ import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { getMainOriginClient, validateAppIdSlug } from '@/lib/constants';
 import { Tooltip } from '@/components/Tooltip';
+import {
+  FORM_ERROR_CLASS,
+  FORM_INPUT_CLASS,
+  FormLabel,
+  PREFIX_INPUT_CLASS,
+  PREFIX_INPUT_WRAPPER_CLASS,
+  PREFIX_TEXT_CLASS,
+} from '@/components/FormField';
 
 function SpinnerIcon({ className }: { className?: string }) {
   return (
@@ -106,7 +114,7 @@ export default function StudioHome() {
     const available = !existing;
     setSlugAvailable(available);
     if (!available) {
-      setAppIdError('このアプリIDはすでに使用されています。別のIDを選んでください。');
+      setAppIdError('このappIDはすでに使用されています。別のIDを選んでください。');
     }
   }, []);
 
@@ -168,7 +176,7 @@ export default function StudioHome() {
       .eq('app_id', trimmedId)
       .maybeSingle();
     if (existing) {
-      setAppIdError('このアプリIDはすでに使用されています。別のIDを選んでください。');
+      setAppIdError('このappIDはすでに使用されています。別のIDを選んでください。');
       return;
     }
 
@@ -474,14 +482,9 @@ export default function StudioHome() {
             </h2>
             <form onSubmit={handleCreateApp} className="mt-6 space-y-4">
               <div>
-                <label
-                  htmlFor="new-app-id"
-                  className="mb-1 block text-xs font-medium text-zinc-800 dark:text-zinc-200"
-                >
-                  appID
-                </label>
-                <div className="flex min-w-0 overflow-hidden rounded-lg border border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800">
-                  <span className="flex shrink-0 items-center border-r border-zinc-200 bg-zinc-100 px-3 py-2 text-xs text-zinc-600 dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-400">
+                <FormLabel htmlFor="new-app-id">appID</FormLabel>
+                <div className={PREFIX_INPUT_WRAPPER_CLASS}>
+                  <span className={PREFIX_TEXT_CLASS}>
                     {getMainOriginClient()}/
                   </span>
                   <div className="relative flex min-w-0 flex-1 items-center">
@@ -495,7 +498,7 @@ export default function StudioHome() {
                         setAppIdError(null);
                       }}
                       placeholder="your-app-id"
-                      className="min-w-0 flex-1 border-0 bg-transparent py-2 pl-3 pr-8 text-sm text-zinc-900 outline-none placeholder:text-zinc-400 focus:ring-0 dark:text-zinc-50 dark:placeholder:text-zinc-500"
+                      className={PREFIX_INPUT_CLASS}
                     />
                     <span className="pointer-events-none absolute right-2 flex h-5 w-5 items-center justify-center text-zinc-400 dark:text-zinc-500">
                       {slugChecking && (
@@ -508,28 +511,23 @@ export default function StudioHome() {
                   </div>
                 </div>
                 {appIdError && (
-                  <p className="mt-1 text-[11px] text-red-500 dark:text-red-400">
+                  <p className={FORM_ERROR_CLASS}>
                     {appIdError}
                   </p>
                 )}
               </div>
               <div>
-                <label
-                  htmlFor="new-app-name"
-                  className="mb-1 block text-xs font-medium text-zinc-800 dark:text-zinc-200"
-                >
-                  アプリ名
-                </label>
+                <FormLabel htmlFor="new-app-name">アプリ名</FormLabel>
                 <input
                   id="new-app-name"
                   type="text"
                   value={newAppName}
                   onChange={(e) => setNewAppName(e.target.value)}
                   placeholder="正式名称を入力"
-                  className="w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-900 outline-none transition placeholder:text-zinc-500 focus:border-zinc-300 focus:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50 dark:placeholder:text-zinc-400 dark:focus:border-zinc-600 dark:focus:bg-zinc-700"
+                  className={FORM_INPUT_CLASS}
                 />
                 {newError && (
-                  <p className="mt-1 text-[11px] text-red-500 dark:text-red-400">
+                  <p className={FORM_ERROR_CLASS}>
                     {newError}
                   </p>
                 )}

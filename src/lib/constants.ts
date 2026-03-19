@@ -39,10 +39,10 @@ export function validateAppIdSlug(
 ): { valid: true } | { valid: false; error: string } {
   const trimmed = value.trim().toLowerCase();
   if (trimmed.length === 0) {
-    return { valid: false, error: 'アプリIDを入力してください。' };
+    return { valid: false, error: 'appIDを入力してください。' };
   }
   if (trimmed.length === 1) {
-    return { valid: false, error: 'アプリIDは2文字以上で入力してください。' };
+    return { valid: false, error: 'appIDは2文字以上で入力してください。' };
   }
   if (!APP_ID_SLUG_REGEX.test(trimmed)) {
     return { valid: false, error: '小文字英数字とハイフンのみ使用できます。' };

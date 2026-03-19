@@ -9,7 +9,6 @@ import { AppPageHeader } from '@/components/AppPageHeader';
 import { ImageUploadInput } from '@/components/ImageUploadInput';
 import { Tooltip } from '@/components/Tooltip';
 import { useAppChanges } from '@/context/AppChangesContext';
-import { useAppHeaderData } from '@/hooks/useAppHeaderData';
 import { type AppFormState, type ReleaseNote, type SectionId, defaultFormState, SECTIONS, type FeaturedItem, parseBmcButtonConfig, parseBmcScriptTag } from '@/lib/app-edit-types';
 
 const INPUT_CLASS =
@@ -26,20 +25,93 @@ function ChevronLeftIcon({ className }: { className?: string }) {
   );
 }
 
-const VISIBILITY_KEYS: Record<SectionId, keyof AppFormState | null> = {
-  hero_header: null,
-  app_specs: null,
-  version: 'version_visible',
-  video: 'video_visible',
-  gallery: 'gallery_visible',
-  free_text: 'free_text_visible',
-  users_voice: 'users_voice_visible',
-  featured: 'featured_visible',
-  inquiry: 'inquiry_visible',
-  developer: null,
-  support: 'support_visible',
-  footer: null,
+const REQUIRED_FIELD_DEFAULTS: Record<string, string> = {
+  name: 'アプリ名',
+  catch_copy: 'ここにキャッチコピーを入力',
+  primary_link: 'https://example.com',
+  os_support: 'macOS 12.0+',
+  file_size: '0 MB',
+  developer_name: '開発者名',
+  developer_bio: '自己紹介を入力してください',
 };
+const REQUIRED_TEXT_FIELDS: Array<keyof AppFormState> = [
+  'name',
+  'catch_copy',
+  'primary_link',
+  'os_support',
+  'file_size',
+  'developer_name',
+  'developer_bio',
+];
+const SECTION_REQUIRED_FIELDS: Partial<Record<SectionId, Array<keyof AppFormState>>> = {
+  hero_header: ['name', 'catch_copy', 'primary_link'],
+  app_specs: ['os_support', 'file_size'],
+  developer: ['developer_name', 'developer_bio'],
+};
+
+function hasSectionContent(sectionId: SectionId, form: AppFormState, reviewCount = 0): boolean {
+  switch (sectionId) {
+    case 'hero_header':
+    case 'app_specs':
+    case 'developer':
+    case 'footer':
+      return true;
+    case 'version':
+      return (
+        form.version_number.trim().length > 0 ||
+        form.release_notes.some((note) => note.version.trim() || note.body.trim() || (note.date ?? '').trim())
+      );
+    case 'video':
+      return form.video_url.trim().length > 0;
+    case 'gallery':
+      return form.gallery_image_urls.some((url) => url.trim().length > 0);
+    case 'free_text':
+      return form.free_text_image_url.trim().length > 0 || form.free_text_markdown.trim().length > 0;
+    case 'users_voice':
+      return reviewCount > 0 || form.users_voice_show_post_button;
+    case 'featured':
+      return form.featured_items.some((item) => item.url.trim().length > 0 || item.note.trim().length > 0);
+    case 'inquiry':
+      return form.inquiry_url.trim().length > 0;
+    case 'support':
+      return form.buy_me_a_coffee_url.trim().length > 0 || Boolean(form.bmc_button_config);
+    default:
+      return false;
+  }
+}
+
+function withRequiredDefaults(state: AppFormState): AppFormState {
+  const next = { ...state };
+  const writable = next as Record<string, unknown>;
+  for (const key of REQUIRED_TEXT_FIELDS) {
+    const val = next[key];
+    if (typeof val === 'string' && !val.trim()) {
+      writable[key] = REQUIRED_FIELD_DEFAULTS[key];
+    }
+  }
+  return next;
+}
+
+function validateRequiredFields(state: AppFormState): string | null {
+  for (const key of REQUIRED_TEXT_FIELDS) {
+    const val = state[key];
+    if (typeof val === 'string' && !val.trim()) {
+      return `${REQUIRED_FIELD_DEFAULTS[key]} は必須です。空にできません。`;
+    }
+  }
+  return null;
+}
+
+function getRequiredFieldErrors(state: AppFormState): Partial<Record<keyof AppFormState, string>> {
+  const errors: Partial<Record<keyof AppFormState, string>> = {};
+  for (const key of REQUIRED_TEXT_FIELDS) {
+    const val = state[key];
+    if (typeof val === 'string' && !val.trim()) {
+      errors[key] = '必須項目です';
+    }
+  }
+  return errors;
+}
 
 function parseJsonArray(val: unknown, fallback: unknown[]): unknown[] {
   if (Array.isArray(val)) return val;
@@ -96,54 +168,6 @@ function parsePriceInput(input: string): string {
   return match ? match[0] : '';
 }
 
-/** ドラフト用: JSON を AppFormState に正規化（不足フィールドは defaultFormState で補う） */
-function parseDraftForm(raw: unknown): AppFormState {
-  const o = raw && typeof raw === 'object' ? raw as Record<string, unknown> : {};
-  return {
-    ...defaultFormState,
-    name: String(o.name ?? defaultFormState.name),
-    catch_copy: String(o.catch_copy ?? defaultFormState.catch_copy),
-    icon_url: String(o.icon_url ?? defaultFormState.icon_url),
-    button_label: String(o.button_label ?? defaultFormState.button_label),
-    button_label_type: (o.button_label_type === 'price' ? 'price' : 'download') as 'download' | 'price',
-    price_currency: String(o.price_currency ?? defaultFormState.price_currency),
-    price_value: String(o.price_value ?? defaultFormState.price_value),
-    primary_link: String(o.primary_link ?? defaultFormState.primary_link),
-    os_support: String(o.os_support ?? defaultFormState.os_support),
-    apple_silicon: Boolean(o.apple_silicon !== false),
-    file_size: String(o.file_size ?? defaultFormState.file_size),
-    version_visible: Boolean(o.version_visible),
-    version_number: String(o.version_number ?? defaultFormState.version_number),
-    release_notes: parseReleaseNotes(o.release_notes),
-    video_visible: Boolean(o.video_visible),
-    video_url: String(o.video_url ?? defaultFormState.video_url),
-    gallery_visible: Boolean(o.gallery_visible),
-    gallery_image_urls: parseJsonArray(o.gallery_image_urls, []).map(String),
-    free_text_visible: Boolean(o.free_text_visible),
-    free_text_image_url: String(o.free_text_image_url ?? defaultFormState.free_text_image_url),
-    free_text_markdown: String(o.free_text_markdown ?? defaultFormState.free_text_markdown),
-    users_voice_visible: Boolean(o.users_voice_visible),
-    users_voice_show_post_button: Boolean(o.users_voice_show_post_button !== false),
-    users_voice_display_order: parseJsonArray(o.users_voice_display_order, []).map(String),
-    featured_visible: Boolean(o.featured_visible),
-    featured_items: parseFeaturedItems(o.featured_items),
-    inquiry_visible: Boolean(o.inquiry_visible),
-    inquiry_url: String(o.inquiry_url ?? defaultFormState.inquiry_url),
-    developer_icon_url: String(o.developer_icon_url ?? defaultFormState.developer_icon_url),
-    developer_name: String(o.developer_name ?? defaultFormState.developer_name),
-    developer_bio: String(o.developer_bio ?? defaultFormState.developer_bio),
-    developer_github: String(o.developer_github ?? defaultFormState.developer_github),
-    developer_x: String(o.developer_x ?? defaultFormState.developer_x),
-    developer_contact_url: String(o.developer_contact_url ?? defaultFormState.developer_contact_url),
-    support_visible: Boolean(o.support_visible),
-    buy_me_a_coffee_url: String(o.buy_me_a_coffee_url ?? defaultFormState.buy_me_a_coffee_url),
-    bmc_button_config: parseBmcButtonConfig(o.bmc_button_config),
-    meta_title: String(o.meta_title ?? defaultFormState.meta_title),
-    meta_description: String(o.meta_description ?? defaultFormState.meta_description),
-    meta_cover_image_url: String(o.meta_cover_image_url ?? defaultFormState.meta_cover_image_url),
-  };
-}
-
 type PageProps = { params: Promise<{ appID?: string }> };
 
 export default function StudioAppEditPage({ params }: PageProps) {
@@ -158,13 +182,13 @@ export default function StudioAppEditPage({ params }: PageProps) {
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof AppFormState, string>>>({});
   const [initialized, setInitialized] = useState(false);
   const [bmcInputMode, setBmcInputMode] = useState<'url' | 'code'>('url');
   const [dirty, setDirty] = useState(false);
   const [isPublished, setIsPublished] = useState(false);
   const [allReviews, setAllReviews] = useState<(ReviewItem & { is_public: boolean })[]>([]);
   const appChanges = useAppChanges();
-  const { publishedCount } = useAppHeaderData(appID);
 
   useEffect(() => {
     if (dirty) appChanges?.setEditDirty(true);
@@ -173,6 +197,13 @@ export default function StudioAppEditPage({ params }: PageProps) {
   const updateForm = useCallback(
     (patch: Partial<AppFormState>) => {
       setForm((prev) => ({ ...prev, ...patch }));
+      setFieldErrors((prev) => {
+        const next = { ...prev };
+        for (const key of Object.keys(patch) as Array<keyof AppFormState>) {
+          delete next[key];
+        }
+        return next;
+      });
       if (initialized) {
         setDirty(true);
       }
@@ -180,29 +211,15 @@ export default function StudioAppEditPage({ params }: PageProps) {
     [initialized]
   );
 
-  const setVisibility = useCallback(
-    (key: keyof AppFormState, value: boolean) => {
-      if (
-        key in defaultFormState &&
-        typeof (defaultFormState as Record<string, unknown>)[key] === 'boolean'
-      ) {
-        updateForm({ [key]: value } as Partial<AppFormState>);
-      }
-    },
-    [updateForm]
-  );
-
   const fetchApp = useCallback(async () => {
     if (!appID) return;
     setLoading(true);
     setError(null);
-    const [
-      { data, error: fetchError },
-      { data: draftRow },
-    ] = await Promise.all([
-      supabase.from('apps').select('*').eq('app_id', appID).maybeSingle(),
-      supabase.from('app_edit_drafts').select('draft_data').eq('app_id', appID).maybeSingle(),
-    ]);
+    const { data, error: fetchError } = await supabase
+      .from('apps')
+      .select('*')
+      .eq('app_id', appID)
+      .maybeSingle();
 
     if (fetchError) {
       console.error(fetchError);
@@ -217,7 +234,11 @@ export default function StudioAppEditPage({ params }: PageProps) {
     }
 
     const r = data as Record<string, unknown>;
-    const baseForm: AppFormState = {
+    const usersVoiceShowPostButton =
+      typeof r.users_voice_show_post_button === 'boolean'
+        ? r.users_voice_show_post_button
+        : Boolean(r.users_voice_visible);
+    const nextForm = withRequiredDefaults({
       name: String(r.name ?? ''),
       catch_copy: String(r.catch_copy ?? ''),
       icon_url: String(r.icon_url ?? ''),
@@ -240,7 +261,7 @@ export default function StudioAppEditPage({ params }: PageProps) {
       free_text_image_url: String(r.free_text_image_url ?? ''),
       free_text_markdown: String(r.free_text_markdown ?? ''),
       users_voice_visible: Boolean(r.users_voice_visible),
-      users_voice_show_post_button: Boolean(r.users_voice_show_post_button !== false),
+      users_voice_show_post_button: usersVoiceShowPostButton,
       users_voice_display_order: parseJsonArray(r.users_voice_display_order, []).map(String),
       featured_visible: Boolean(r.featured_visible),
       featured_items: parseFeaturedItems(r.featured_items),
@@ -258,17 +279,15 @@ export default function StudioAppEditPage({ params }: PageProps) {
       meta_title: String(r.meta_title ?? ''),
       meta_description: String(r.meta_description ?? ''),
       meta_cover_image_url: String(r.meta_cover_image_url ?? ''),
-    };
-    const formToUse = draftRow?.draft_data != null ? parseDraftForm(draftRow.draft_data) : baseForm;
-    setForm(formToUse);
-    setBmcInputMode(formToUse.bmc_button_config ? 'code' : 'url');
-    setIsPublished(Boolean(r.is_published));
-    if (draftRow?.draft_data != null) {
-      appChanges?.setEditDirty(true);
+    });
+    setForm(nextForm);
+    if (parseBmcButtonConfig(r.bmc_button_config)) {
+      setBmcInputMode('code');
     }
+    setIsPublished(Boolean(r.is_published));
     setInitialized(true);
     setLoading(false);
-  }, [appID, appChanges]);
+  }, [appID]);
 
   useEffect(() => {
     fetchApp();
@@ -305,29 +324,26 @@ export default function StudioAppEditPage({ params }: PageProps) {
     });
   }, [allReviews, pendingChanges]);
 
-  /** 変更差分をドラフトに即時保存（プロジェクト離脱後も保持）。「更新」で apps に反映するまで未反映のまま。 */
-  const saveDraft = useCallback(async () => {
-    if (!appID) return;
-    const draftData = { ...form };
-    const { error: draftError } = await supabase
-      .from('app_edit_drafts')
-      .upsert(
-        { app_id: appID, draft_data: draftData, updated_at: new Date().toISOString() },
-        { onConflict: 'app_id' }
-      );
-    if (draftError) {
-      console.error(draftError);
-      setError('変更の保存に失敗しました。');
-      return;
+  const handleSave = useCallback(async (): Promise<boolean> => {
+    const errors = getRequiredFieldErrors(form);
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      setError('エラー項目を解消して下さい');
+      return false;
     }
-    appChanges?.setEditDirty(true);
-  }, [appID, form, appChanges]);
-
-  /** ドラフトを apps に反映し、ドラフトを削除（ヘッダー「更新」で呼ばれる） */
-  const handleSave = useCallback(async () => {
-    if (!appID) return;
+    setFieldErrors({});
     setSaving(true);
     setError(null);
+    const visibility = {
+      version_visible: hasSectionContent('version', form, previewReviews.length),
+      video_visible: hasSectionContent('video', form, previewReviews.length),
+      gallery_visible: hasSectionContent('gallery', form, previewReviews.length),
+      free_text_visible: hasSectionContent('free_text', form, previewReviews.length),
+      users_voice_visible: hasSectionContent('users_voice', form, previewReviews.length),
+      featured_visible: hasSectionContent('featured', form, previewReviews.length),
+      inquiry_visible: hasSectionContent('inquiry', form, previewReviews.length),
+      support_visible: hasSectionContent('support', form, previewReviews.length),
+    };
     const payload = {
       name: form.name.trim() || null,
       catch_copy: form.catch_copy.trim() || null,
@@ -341,22 +357,22 @@ export default function StudioAppEditPage({ params }: PageProps) {
       os_support: form.os_support.trim() || null,
       apple_silicon: form.apple_silicon,
       file_size: form.file_size.trim() || null,
-      version_visible: form.version_visible,
+      version_visible: visibility.version_visible,
       version_number: form.version_number.trim() || null,
       release_notes: form.release_notes,
-      video_visible: form.video_visible,
+      video_visible: visibility.video_visible,
       video_url: form.video_url.trim() || null,
-      gallery_visible: form.gallery_visible,
+      gallery_visible: visibility.gallery_visible,
       gallery_image_urls: form.gallery_image_urls,
-      free_text_visible: form.free_text_visible,
+      free_text_visible: visibility.free_text_visible,
       free_text_image_url: form.free_text_image_url.trim() || null,
       free_text_markdown: form.free_text_markdown.trim() || null,
-      users_voice_visible: form.users_voice_visible,
+      users_voice_visible: visibility.users_voice_visible,
       users_voice_show_post_button: form.users_voice_show_post_button,
       users_voice_display_order: form.users_voice_display_order,
-      featured_visible: form.featured_visible,
+      featured_visible: visibility.featured_visible,
       featured_items: form.featured_items,
-      inquiry_visible: form.inquiry_visible,
+      inquiry_visible: visibility.inquiry_visible,
       inquiry_url: form.inquiry_url.trim() || null,
       developer_icon_url: form.developer_icon_url.trim() || null,
       developer_name: form.developer_name.trim() || null,
@@ -364,13 +380,12 @@ export default function StudioAppEditPage({ params }: PageProps) {
       developer_github: form.developer_github.trim() || null,
       developer_x: form.developer_x.trim() || null,
       developer_contact_url: form.developer_contact_url.trim() || null,
-      support_visible: form.support_visible,
+      support_visible: visibility.support_visible,
       buy_me_a_coffee_url: bmcInputMode === 'url' ? (form.buy_me_a_coffee_url.trim() || null) : null,
       bmc_button_config: bmcInputMode === 'code' ? form.bmc_button_config : null,
       meta_title: form.meta_title.trim() || null,
       meta_description: form.meta_description.trim() || null,
       meta_cover_image_url: form.meta_cover_image_url.trim() || null,
-      last_reflected_at: new Date().toISOString(),
     };
     const { error: updateError } = await supabase
       .from('apps')
@@ -378,36 +393,44 @@ export default function StudioAppEditPage({ params }: PageProps) {
       .eq('app_id', appID);
     if (updateError) {
       console.error(updateError);
-      setError('反映に失敗しました。');
+      setError('保存に失敗しました。');
       setSaving(false);
-      return;
+      return false;
     }
-    await supabase.from('app_edit_drafts').delete().eq('app_id', appID);
-    appChanges?.setEditDirty(false);
     setSaving(false);
-  }, [appID, form, bmcInputMode, appChanges]);
+    return true;
+  }, [appID, form, bmcInputMode, previewReviews.length]);
 
-  // 編集内容をドラフトに自動保存（800ms デバウンス）。未反映の変更として保持する。
+  // 自動保存（初期ロード後の変更のみ）
   useEffect(() => {
     if (!initialized || !dirty) return;
     const timer = setTimeout(() => {
-      void saveDraft();
-      setDirty(false);
+      void (async () => {
+        const saved = await handleSave();
+        if (saved) {
+          setDirty(false);
+        }
+      })();
     }, 800);
     return () => clearTimeout(timer);
-  }, [initialized, dirty, saveDraft]);
+  }, [initialized, dirty, handleSave]);
 
-  /** ヘッダー「更新」用: ドラフトを apps に反映して editDirty をクリア */
+  /** ヘッダー「更新」用: 保存してから公開反映済みとして editDirty をクリア */
   const handleHeaderUpdate = useCallback(async () => {
-    await handleSave();
-  }, [handleSave]);
+    const saved = await handleSave();
+    if (!saved) {
+      window.alert('エラー項目を解消して下さい');
+      return;
+    }
+    appChanges?.setEditDirty(false);
+  }, [handleSave, appChanges]);
 
   const handlePublish = useCallback(async () => {
     setPublishing(true);
     setError(null);
     const { error: updateError } = await supabase
       .from('apps')
-      .update({ is_published: true, last_reflected_at: new Date().toISOString() })
+      .update({ is_published: true })
       .eq('app_id', appID);
     if (updateError) {
       console.error(updateError);
@@ -444,7 +467,7 @@ export default function StudioAppEditPage({ params }: PageProps) {
     );
   }
 
-  if (error && !form.name) {
+  if (error && !initialized) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-zinc-50 px-4 dark:bg-zinc-950">
         <p className="text-sm text-red-500 dark:text-red-400">{error}</p>
@@ -461,7 +484,12 @@ export default function StudioAppEditPage({ params }: PageProps) {
 
   const currentSectionName =
     focusedSection != null ? SECTIONS.find((s) => s.id === focusedSection)?.nameJa ?? focusedSection : '';
-  const visibilityKey = focusedSection != null ? VISIBILITY_KEYS[focusedSection] : null;
+  const getInputClass = (key: keyof AppFormState) =>
+    `${INPUT_CLASS} ${fieldErrors[key] ? 'border border-red-400 bg-red-50 focus:bg-red-50 focus:ring-red-300 dark:border-red-500 dark:bg-red-950/20 dark:focus:bg-red-950/20 dark:focus:ring-red-800' : ''}`;
+  const sectionHasErrors = (sectionId: SectionId): boolean => {
+    const keys = SECTION_REQUIRED_FIELDS[sectionId] ?? [];
+    return keys.some((key) => Boolean(fieldErrors[key]));
+  };
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950">
@@ -469,7 +497,6 @@ export default function StudioAppEditPage({ params }: PageProps) {
         appID={appID}
         isPublished={isPublished}
         appTitle={form.name}
-        publishedCount={publishedCount}
         onSave={handleHeaderUpdate}
         onPublish={handlePublish}
         onUnpublish={handleUnpublish}
@@ -490,11 +517,9 @@ export default function StudioAppEditPage({ params }: PageProps) {
               </h2>
               <div className="flex flex-col divide-y divide-zinc-200 dark:divide-zinc-700">
                 {SECTIONS.map((section) => {
-                  const visKey = VISIBILITY_KEYS[section.id];
-                  const isVisible = visKey && (form[visKey] as boolean);
-                  const isRequired = section.necessary === 'required';
-                  const isOn = isRequired || !!isVisible;
+                  const isOn = hasSectionContent(section.id, form, previewReviews.length);
                   const isItemHovered = hoveredSection === section.id;
+                  const hasErrors = sectionHasErrors(section.id);
                   return (
                     <button
                       key={section.id}
@@ -506,41 +531,22 @@ export default function StudioAppEditPage({ params }: PageProps) {
                         isItemHovered ? 'bg-zinc-100 dark:bg-zinc-800/50' : ''
                       }`}
                     >
-                      {isRequired ? (
-                        <span
-                          aria-label="常に表示"
-                          className="flex shrink-0 items-center justify-center rounded-lg border-[0.7px] border-zinc-200 p-1.5 text-zinc-300 opacity-50 dark:border-zinc-700 dark:text-zinc-600"
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4">
-                            <path d="M10.088 13.413Q9.3 12.625 9.3 11.5t.788-1.912T12 8.8t1.913.788t.787 1.912t-.787 1.913T12 14.2t-1.912-.787M12 19q-3.65 0-6.65-2.037T1 11.5q1.35-3.425 4.35-5.462T12 4q3.525 0 6.438 1.9T22.8 11H19q-.7 0-1.325.175t-1.175.5V11.5q0-1.875-1.312-3.187T12 7T8.813 8.313T7.5 11.5t1.313 3.188T12 16q.55 0 1.063-.125t.962-.35q-.025.125-.025.238v3.062q-.5.075-1 .125T12 19m5 2q-.425 0-.712-.288T16 20v-3q0-.425.288-.712T17 16v-1q0-.825.588-1.412T19 13t1.413.588T21 15v1q.425 0 .713.288T22 17v3q0 .425-.288.713T21 21zm1-5h2v-1q0-.425-.288-.712T19 14t-.712.288T18 15z" />
+                      <span
+                        className={`flex h-7 w-7 shrink-0 items-center justify-center ${
+                          hasErrors ? 'text-red-500 dark:text-red-400' : 'text-zinc-400 dark:text-zinc-500'
+                        }`}
+                        aria-hidden
+                      >
+                        {hasErrors ? (
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
+                            <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.72-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.981-1.742 2.981H4.42c-1.53 0-2.492-1.647-1.742-2.98l5.58-9.921zM11 13a1 1 0 1 1-2 0 1 1 0 0 1 2 0zm-1-6a1 1 0 0 0-1 1v3a1 1 0 1 0 2 0V8a1 1 0 0 0-1-1z" clipRule="evenodd" />
                           </svg>
-                        </span>
-                      ) : visKey ? (
-                        <span
-                          role="button"
-                          aria-label={isOn ? '非表示にする' : '表示する'}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setVisibility(visKey, !isVisible);
-                          }}
-                          className={`flex shrink-0 items-center justify-center rounded-lg border-[0.7px] p-1.5 transition ${
-                            isOn
-                              ? 'border-blue-400 bg-blue-50 text-blue-600 hover:bg-blue-100 dark:border-blue-500 dark:bg-blue-950 dark:text-blue-400 dark:hover:bg-blue-900'
-                              : 'border-zinc-200 text-zinc-300 hover:bg-white dark:border-zinc-700 dark:text-zinc-600 dark:hover:bg-zinc-800'
-                          }`}
-                        >
-                          {isOn ? (
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4">
-                              <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17a5 5 0 1 1 0-10 5 5 0 0 1 0 10zm0-8a3 3 0 1 0 0 6 3 3 0 0 0 0-6z" />
-                            </svg>
-                          ) : (
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
-                              <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
-                              <line x1="1" y1="1" x2="23" y2="23" />
-                            </svg>
-                          )}
-                        </span>
-                      ) : null}
+                        ) : isOn ? (
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
+                            <path fillRule="evenodd" d="M16.704 5.29a1 1 0 0 1 .006 1.414l-7.25 7.313a1 1 0 0 1-1.42.003l-3.75-3.75a1 1 0 1 1 1.414-1.414l3.04 3.04 6.543-6.598a1 1 0 0 1 1.417-.008z" clipRule="evenodd" />
+                          </svg>
+                        ) : null}
+                      </span>
                       <span className="min-w-0 flex-1 text-sm font-medium text-zinc-900 dark:text-zinc-100">
                         {section.nameJa}
                       </span>
@@ -563,49 +569,11 @@ export default function StudioAppEditPage({ params }: PageProps) {
                   <ChevronLeftIcon className="h-4 w-4 shrink-0" />
                   一覧に戻る
                 </button>
-                {(() => {
-                  const isRequired = focusedSection != null && SECTIONS.find((s) => s.id === focusedSection)?.necessary === 'required';
-                  const isOn = isRequired || !!(visibilityKey && (form[visibilityKey] as boolean));
-                  return (
-                    <div className="mb-4 flex items-center justify-between">
-                      <h1 className="text-base font-semibold text-zinc-900 dark:text-zinc-50">
-                        {currentSectionName}
-                      </h1>
-                      {isRequired ? (
-                        <span
-                          aria-label="常に表示"
-                          className="flex shrink-0 items-center justify-center rounded-lg border-[0.7px] border-zinc-200 p-1.5 text-zinc-300 opacity-50 dark:border-zinc-700 dark:text-zinc-600"
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4">
-                            <path d="M10.088 13.413Q9.3 12.625 9.3 11.5t.788-1.912T12 8.8t1.913.788t.787 1.912t-.787 1.913T12 14.2t-1.912-.787M12 19q-3.65 0-6.65-2.037T1 11.5q1.35-3.425 4.35-5.462T12 4q3.525 0 6.438 1.9T22.8 11H19q-.7 0-1.325.175t-1.175.5V11.5q0-1.875-1.312-3.187T12 7T8.813 8.313T7.5 11.5t1.313 3.188T12 16q.55 0 1.063-.125t.962-.35q-.025.125-.025.238v3.062q-.5.075-1 .125T12 19m5 2q-.425 0-.712-.288T16 20v-3q0-.425.288-.712T17 16v-1q0-.825.588-1.412T19 13t1.413.588T21 15v1q.425 0 .713.288T22 17v3q0 .425-.288.713T21 21zm1-5h2v-1q0-.425-.288-.712T19 14t-.712.288T18 15z" />
-                          </svg>
-                        </span>
-                      ) : visibilityKey ? (
-                        <button
-                          type="button"
-                          aria-label={isOn ? '非表示にする' : '表示する'}
-                          onClick={() => setVisibility(visibilityKey, !(form[visibilityKey] as boolean))}
-                          className={`flex shrink-0 items-center justify-center rounded-lg border-[0.7px] p-1.5 transition ${
-                            isOn
-                              ? 'border-blue-400 bg-blue-50 text-blue-600 hover:bg-blue-100 dark:border-blue-500 dark:bg-blue-950 dark:text-blue-400 dark:hover:bg-blue-900'
-                              : 'border-zinc-200 text-zinc-300 hover:bg-white dark:border-zinc-700 dark:text-zinc-600 dark:hover:bg-zinc-800'
-                          }`}
-                        >
-                          {isOn ? (
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4">
-                              <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17a5 5 0 1 1 0-10 5 5 0 0 1 0 10zm0-8a3 3 0 1 0 0 6 3 3 0 0 0 0-6z" />
-                            </svg>
-                          ) : (
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
-                              <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
-                              <line x1="1" y1="1" x2="23" y2="23" />
-                            </svg>
-                          )}
-                        </button>
-                      ) : null}
-                    </div>
-                  );
-                })()}
+                <div className="mb-4">
+                  <h1 className="text-base font-semibold text-zinc-900 dark:text-zinc-50">
+                    {currentSectionName}
+                  </h1>
+                </div>
 
             <div className="space-y-4">
               {focusedSection === 'hero_header' && (
@@ -623,8 +591,9 @@ export default function StudioAppEditPage({ params }: PageProps) {
                       value={form.name}
                       onChange={(e) => updateForm({ name: e.target.value })}
                       placeholder="アプリ名"
-                      className={INPUT_CLASS}
+                      className={getInputClass('name')}
                     />
+                    {fieldErrors.name && <p className="mt-1 text-xs text-red-500 dark:text-red-400">{fieldErrors.name}</p>}
                   </div>
                   <div>
                     <label className={LABEL_CLASS}>キャッチコピー</label>
@@ -633,8 +602,9 @@ export default function StudioAppEditPage({ params }: PageProps) {
                       value={form.catch_copy}
                       onChange={(e) => updateForm({ catch_copy: e.target.value })}
                       placeholder="キャッチコピー"
-                      className={INPUT_CLASS}
+                      className={getInputClass('catch_copy')}
                     />
+                    {fieldErrors.catch_copy && <p className="mt-1 text-xs text-red-500 dark:text-red-400">{fieldErrors.catch_copy}</p>}
                   </div>
                   <div>
                     <label className={LABEL_CLASS}>ボタンラベル</label>
@@ -687,8 +657,9 @@ export default function StudioAppEditPage({ params }: PageProps) {
                       value={form.primary_link}
                       onChange={(e) => updateForm({ primary_link: e.target.value })}
                       placeholder="https://..."
-                      className={INPUT_CLASS}
+                      className={getInputClass('primary_link')}
                     />
+                    {fieldErrors.primary_link && <p className="mt-1 text-xs text-red-500 dark:text-red-400">{fieldErrors.primary_link}</p>}
                   </div>
                 </>
               )}
@@ -702,8 +673,9 @@ export default function StudioAppEditPage({ params }: PageProps) {
                       value={form.os_support}
                       onChange={(e) => updateForm({ os_support: e.target.value })}
                       placeholder="macOS 12.0+"
-                      className={INPUT_CLASS}
+                      className={getInputClass('os_support')}
                     />
+                    {fieldErrors.os_support && <p className="mt-1 text-xs text-red-500 dark:text-red-400">{fieldErrors.os_support}</p>}
                   </div>
                   <div className="flex items-center gap-2">
                     <input
@@ -724,8 +696,9 @@ export default function StudioAppEditPage({ params }: PageProps) {
                       value={form.file_size}
                       onChange={(e) => updateForm({ file_size: e.target.value })}
                       placeholder="例: 45 MB"
-                      className={INPUT_CLASS}
+                      className={getInputClass('file_size')}
                     />
+                    {fieldErrors.file_size && <p className="mt-1 text-xs text-red-500 dark:text-red-400">{fieldErrors.file_size}</p>}
                   </div>
                 </>
               )}
@@ -1007,8 +980,9 @@ export default function StudioAppEditPage({ params }: PageProps) {
                       value={form.developer_name}
                       onChange={(e) => updateForm({ developer_name: e.target.value })}
                       placeholder="名前"
-                      className={INPUT_CLASS}
+                      className={getInputClass('developer_name')}
                     />
+                    {fieldErrors.developer_name && <p className="mt-1 text-xs text-red-500 dark:text-red-400">{fieldErrors.developer_name}</p>}
                   </div>
                   <div>
                     <label className={LABEL_CLASS}>Bio</label>
@@ -1017,8 +991,9 @@ export default function StudioAppEditPage({ params }: PageProps) {
                       onChange={(e) => updateForm({ developer_bio: e.target.value })}
                       placeholder="自己紹介"
                       rows={3}
-                      className={INPUT_CLASS}
+                      className={getInputClass('developer_bio')}
                     />
+                    {fieldErrors.developer_bio && <p className="mt-1 text-xs text-red-500 dark:text-red-400">{fieldErrors.developer_bio}</p>}
                   </div>
                   <div>
                     <label className={LABEL_CLASS}>GitHub URL</label>
@@ -1132,13 +1107,13 @@ export default function StudioAppEditPage({ params }: PageProps) {
               {focusedSection === 'footer' && null}
             </div>
 
-            {error && (
+            {error && error !== 'エラー項目を解消して下さい' && (
               <p className="mt-4 text-sm text-red-500 dark:text-red-400">
                 {error}
               </p>
             )}
             <p className="mt-4 text-xs text-zinc-500 dark:text-zinc-400">
-              {saving ? '自動保存中…' : 'すべての変更は自動保存されます'}
+              {saving ? '自動保存中…' : (error === 'エラー項目を解消して下さい' ? '未保存（入力エラーがあります）' : 'すべての変更は自動保存されます')}
             </p>
               </div>
             </div>
