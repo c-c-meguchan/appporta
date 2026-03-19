@@ -92,16 +92,6 @@ function withRequiredDefaults(state: AppFormState): AppFormState {
   return next;
 }
 
-function validateRequiredFields(state: AppFormState): string | null {
-  for (const key of REQUIRED_TEXT_FIELDS) {
-    const val = state[key];
-    if (typeof val === 'string' && !val.trim()) {
-      return `${REQUIRED_FIELD_DEFAULTS[key]} は必須です。空にできません。`;
-    }
-  }
-  return null;
-}
-
 function getRequiredFieldErrors(state: AppFormState): Partial<Record<keyof AppFormState, string>> {
   const errors: Partial<Record<keyof AppFormState, string>> = {};
   for (const key of REQUIRED_TEXT_FIELDS) {
@@ -111,6 +101,16 @@ function getRequiredFieldErrors(state: AppFormState): Partial<Record<keyof AppFo
     }
   }
   return errors;
+}
+
+function actionValidationMessage(action: 'update' | 'publish'): string {
+  return action === 'publish'
+    ? '公開するにはエラー項目を解消して下さい'
+    : '更新するにはエラー項目を解消して下さい';
+}
+
+function isValidationErrorMessage(message: string | null): boolean {
+  return Boolean(message && message.includes('エラー項目を解消して下さい'));
 }
 
 function parseJsonArray(val: unknown, fallback: unknown[]): unknown[] {
@@ -324,11 +324,11 @@ export default function StudioAppEditPage({ params }: PageProps) {
     });
   }, [allReviews, pendingChanges]);
 
-  const handleSave = useCallback(async (): Promise<boolean> => {
+  const handleSave = useCallback(async (action: 'update' | 'publish' = 'update'): Promise<boolean> => {
     const errors = getRequiredFieldErrors(form);
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
-      setError('エラー項目を解消して下さい');
+      setError(actionValidationMessage(action));
       return false;
     }
     setFieldErrors({});
@@ -417,15 +417,20 @@ export default function StudioAppEditPage({ params }: PageProps) {
 
   /** ヘッダー「更新」用: 保存してから公開反映済みとして editDirty をクリア */
   const handleHeaderUpdate = useCallback(async () => {
-    const saved = await handleSave();
+    const saved = await handleSave('update');
     if (!saved) {
-      window.alert('エラー項目を解消して下さい');
+      window.alert(actionValidationMessage('update'));
       return;
     }
     appChanges?.setEditDirty(false);
   }, [handleSave, appChanges]);
 
   const handlePublish = useCallback(async () => {
+    const saved = await handleSave('publish');
+    if (!saved) {
+      window.alert(actionValidationMessage('publish'));
+      return;
+    }
     setPublishing(true);
     setError(null);
     const { error: updateError } = await supabase
@@ -440,7 +445,7 @@ export default function StudioAppEditPage({ params }: PageProps) {
     }
     setIsPublished(true);
     setPublishing(false);
-  }, [appID]);
+  }, [appID, handleSave]);
 
   const handleUnpublish = useCallback(async () => {
     setPublishing(true);
@@ -1107,13 +1112,13 @@ export default function StudioAppEditPage({ params }: PageProps) {
               {focusedSection === 'footer' && null}
             </div>
 
-            {error && error !== 'エラー項目を解消して下さい' && (
+            {error && !isValidationErrorMessage(error) && (
               <p className="mt-4 text-sm text-red-500 dark:text-red-400">
                 {error}
               </p>
             )}
             <p className="mt-4 text-xs text-zinc-500 dark:text-zinc-400">
-              {saving ? '自動保存中…' : (error === 'エラー項目を解消して下さい' ? '未保存（入力エラーがあります）' : 'すべての変更は自動保存されます')}
+              {saving ? '自動保存中…' : (isValidationErrorMessage(error) ? '未保存（入力エラーがあります）' : 'すべての変更は自動保存されます')}
             </p>
               </div>
             </div>
