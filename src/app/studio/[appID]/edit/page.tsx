@@ -15,22 +15,77 @@ const LABEL_CLASS =
   'block text-xs font-medium text-zinc-800 dark:text-zinc-200 mb-1';
 const SELECT_CLASS = `${INPUT_CLASS} pr-9`;
 
-const VISIBILITY_KEYS: Record<SectionId, keyof AppFormState | null> = {
-  hero_header: null,
-  app_specs: null,
-  version: 'version_visible',
-  video: 'video_visible',
-  gallery: 'gallery_visible',
-  free_text: 'free_text_visible',
-  users_voice: 'users_voice_visible',
-  featured: 'featured_visible',
-  inquiry: 'inquiry_visible',
-  developer: null,
-  support: 'support_visible',
-  footer: null,
-};
-
 const IMAGE_BUCKET = 'app-images';
+const REQUIRED_FIELD_DEFAULTS: Record<string, string> = {
+  name: 'アプリ名',
+  catch_copy: 'ここにキャッチコピーを入力',
+  primary_link: 'https://example.com',
+  os_support: 'macOS 12.0+',
+  file_size: '0 MB',
+  developer_name: '開発者名',
+  developer_bio: '自己紹介を入力してください',
+};
+const REQUIRED_TEXT_FIELDS: Array<keyof AppFormState> = [
+  'name',
+  'catch_copy',
+  'primary_link',
+  'os_support',
+  'file_size',
+  'developer_name',
+  'developer_bio',
+];
+
+function hasSectionContent(sectionId: SectionId, form: AppFormState, reviewCount = 0): boolean {
+  switch (sectionId) {
+    case 'hero_header':
+    case 'app_specs':
+    case 'developer':
+    case 'footer':
+      return true;
+    case 'version':
+      return (
+        form.version_number.trim().length > 0 ||
+        form.release_notes.some((note) => note.version.trim() || note.body.trim() || (note.date ?? '').trim())
+      );
+    case 'video':
+      return form.video_url.trim().length > 0;
+    case 'gallery':
+      return form.gallery_image_urls.some((url) => url.trim().length > 0);
+    case 'free_text':
+      return form.free_text_image_url.trim().length > 0 || form.free_text_markdown.trim().length > 0;
+    case 'users_voice':
+      return reviewCount > 0 || form.users_voice_show_post_button;
+    case 'featured':
+      return form.featured_items.some((item) => item.url.trim().length > 0 || item.note.trim().length > 0);
+    case 'inquiry':
+      return form.inquiry_url.trim().length > 0;
+    case 'support':
+      return form.buy_me_a_coffee_url.trim().length > 0 || Boolean(form.bmc_button_config);
+    default:
+      return false;
+  }
+}
+
+function withRequiredDefaults(state: AppFormState): AppFormState {
+  const next = { ...state };
+  for (const key of REQUIRED_TEXT_FIELDS) {
+    const val = next[key];
+    if (typeof val === 'string' && !val.trim()) {
+      next[key] = REQUIRED_FIELD_DEFAULTS[key] as any;
+    }
+  }
+  return next;
+}
+
+function validateRequiredFields(state: AppFormState): string | null {
+  for (const key of REQUIRED_TEXT_FIELDS) {
+    const val = state[key];
+    if (typeof val === 'string' && !val.trim()) {
+      return `${REQUIRED_FIELD_DEFAULTS[key]} は必須です。空にできません。`;
+    }
+  }
+  return null;
+}
 
 function parseJsonArray(val: unknown, fallback: any[]): any[] {
   if (Array.isArray(val)) return val;
@@ -243,18 +298,6 @@ export default function StudioAppEditPage({ params }: PageProps) {
     [initialized]
   );
 
-  const setVisibility = useCallback(
-    (key: keyof AppFormState, value: boolean) => {
-      if (
-        key in defaultFormState &&
-        typeof (defaultFormState as Record<string, unknown>)[key] === 'boolean'
-      ) {
-        updateForm({ [key]: value } as Partial<AppFormState>);
-      }
-    },
-    [updateForm]
-  );
-
   const fetchApp = useCallback(async () => {
     if (!appID) return;
     setLoading(true);
@@ -278,7 +321,12 @@ export default function StudioAppEditPage({ params }: PageProps) {
     }
 
     const r = data as Record<string, unknown>;
-    setForm({
+    const usersVoiceShowPostButton =
+      typeof r.users_voice_show_post_button === 'boolean'
+        ? r.users_voice_show_post_button
+        : Boolean(r.users_voice_visible);
+
+    const nextForm = withRequiredDefaults({
       name: String(r.name ?? ''),
       catch_copy: String(r.catch_copy ?? ''),
       icon_url: String(r.icon_url ?? ''),
@@ -301,7 +349,7 @@ export default function StudioAppEditPage({ params }: PageProps) {
       free_text_image_url: String(r.free_text_image_url ?? ''),
       free_text_markdown: String(r.free_text_markdown ?? ''),
       users_voice_visible: Boolean(r.users_voice_visible),
-      users_voice_show_post_button: Boolean(r.users_voice_show_post_button !== false),
+      users_voice_show_post_button: usersVoiceShowPostButton,
       users_voice_display_order: parseJsonArray(r.users_voice_display_order, []).map(String),
       featured_visible: Boolean(r.featured_visible),
       featured_items: parseFeaturedItems(r.featured_items),
@@ -320,6 +368,8 @@ export default function StudioAppEditPage({ params }: PageProps) {
       meta_description: String(r.meta_description ?? ''),
       meta_cover_image_url: String(r.meta_cover_image_url ?? ''),
     });
+
+    setForm(nextForm);
     if (parseBmcButtonConfig(r.bmc_button_config)) {
       setBmcInputMode('code');
     }
@@ -356,8 +406,24 @@ export default function StudioAppEditPage({ params }: PageProps) {
   }, [appID]);
 
   const handleSave = useCallback(async () => {
+    const validationError = validateRequiredFields(form);
+    if (validationError) {
+      setError(validationError);
+      setSaving(false);
+      return;
+    }
     setSaving(true);
     setError(null);
+    const visibility = {
+      version_visible: hasSectionContent('version', form, previewReviews.length),
+      video_visible: hasSectionContent('video', form, previewReviews.length),
+      gallery_visible: hasSectionContent('gallery', form, previewReviews.length),
+      free_text_visible: hasSectionContent('free_text', form, previewReviews.length),
+      users_voice_visible: hasSectionContent('users_voice', form, previewReviews.length),
+      featured_visible: hasSectionContent('featured', form, previewReviews.length),
+      inquiry_visible: hasSectionContent('inquiry', form, previewReviews.length),
+      support_visible: hasSectionContent('support', form, previewReviews.length),
+    };
     const payload = {
       name: form.name.trim() || null,
       catch_copy: form.catch_copy.trim() || null,
@@ -371,22 +437,22 @@ export default function StudioAppEditPage({ params }: PageProps) {
       os_support: form.os_support.trim() || null,
       apple_silicon: form.apple_silicon,
       file_size: form.file_size.trim() || null,
-      version_visible: form.version_visible,
+      version_visible: visibility.version_visible,
       version_number: form.version_number.trim() || null,
       release_notes: form.release_notes,
-      video_visible: form.video_visible,
+      video_visible: visibility.video_visible,
       video_url: form.video_url.trim() || null,
-      gallery_visible: form.gallery_visible,
+      gallery_visible: visibility.gallery_visible,
       gallery_image_urls: form.gallery_image_urls,
-      free_text_visible: form.free_text_visible,
+      free_text_visible: visibility.free_text_visible,
       free_text_image_url: form.free_text_image_url.trim() || null,
       free_text_markdown: form.free_text_markdown.trim() || null,
-      users_voice_visible: form.users_voice_visible,
+      users_voice_visible: visibility.users_voice_visible,
       users_voice_show_post_button: form.users_voice_show_post_button,
       users_voice_display_order: form.users_voice_display_order,
-      featured_visible: form.featured_visible,
+      featured_visible: visibility.featured_visible,
       featured_items: form.featured_items,
-      inquiry_visible: form.inquiry_visible,
+      inquiry_visible: visibility.inquiry_visible,
       inquiry_url: form.inquiry_url.trim() || null,
       developer_icon_url: form.developer_icon_url.trim() || null,
       developer_name: form.developer_name.trim() || null,
@@ -394,13 +460,12 @@ export default function StudioAppEditPage({ params }: PageProps) {
       developer_github: form.developer_github.trim() || null,
       developer_x: form.developer_x.trim() || null,
       developer_contact_url: form.developer_contact_url.trim() || null,
-      support_visible: form.support_visible,
+      support_visible: visibility.support_visible,
       buy_me_a_coffee_url: bmcInputMode === 'url' ? (form.buy_me_a_coffee_url.trim() || null) : null,
       bmc_button_config: bmcInputMode === 'code' ? form.bmc_button_config : null,
       meta_title: form.meta_title.trim() || null,
       meta_description: form.meta_description.trim() || null,
       meta_cover_image_url: form.meta_cover_image_url.trim() || null,
-      last_reflected_at: new Date().toISOString(),
     };
     const { error: updateError } = await supabase
       .from('apps')
@@ -411,7 +476,7 @@ export default function StudioAppEditPage({ params }: PageProps) {
       setError('保存に失敗しました。');
     }
     setSaving(false);
-  }, [appID, form, bmcInputMode]);
+  }, [appID, form, bmcInputMode, previewReviews.length]);
 
   // 自動保存（初期ロード後の変更のみ）
   useEffect(() => {
@@ -428,7 +493,7 @@ export default function StudioAppEditPage({ params }: PageProps) {
     setError(null);
     const { error: updateError } = await supabase
       .from('apps')
-      .update({ is_published: true, last_reflected_at: new Date().toISOString() })
+      .update({ is_published: true })
       .eq('app_id', appID);
     if (updateError) {
       console.error(updateError);
@@ -482,7 +547,6 @@ export default function StudioAppEditPage({ params }: PageProps) {
 
   const currentSectionName =
     focusedSection != null ? SECTIONS.find((s) => s.id === focusedSection)?.nameJa ?? focusedSection : '';
-  const visibilityKey = focusedSection != null ? VISIBILITY_KEYS[focusedSection] : null;
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950">
@@ -554,9 +618,8 @@ export default function StudioAppEditPage({ params }: PageProps) {
             </h2>
             <div className="flex flex-wrap gap-1.5">
               {SECTIONS.map((section) => {
-                const visKey = VISIBILITY_KEYS[section.id];
                 const isFocused = focusedSection === section.id;
-                const isVisible = visKey && (form[visKey] as boolean);
+                const isVisible = hasSectionContent(section.id, form, previewReviews.length);
                 return (
                   <button
                     key={section.id}
@@ -569,18 +632,11 @@ export default function StudioAppEditPage({ params }: PageProps) {
                     }`}
                   >
                     {section.nameJa}
-                    {section.necessary === 'optional' && visKey && (
-                      <span className="inline-flex shrink-0 opacity-80" aria-hidden>
-                        {isVisible ? (
-                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-3.5 w-3.5" aria-label="表示">
-                            <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17a5 5 0 1 1 0-10 5 5 0 0 1 0 10zm0-8a3 3 0 1 0 0 6 3 3 0 0 0 0-6z" />
-                          </svg>
-                        ) : (
-                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5" aria-label="非表示">
-                            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
-                            <line x1="1" y1="1" x2="23" y2="23" />
-                          </svg>
-                        )}
+                    {isVisible && (
+                      <span className="inline-flex shrink-0 opacity-90" aria-hidden>
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5">
+                          <path fillRule="evenodd" d="M16.704 5.29a1 1 0 0 1 .006 1.414l-7.25 7.313a1 1 0 0 1-1.42.003l-3.75-3.75a1 1 0 1 1 1.414-1.414l3.04 3.04 6.543-6.598a1 1 0 0 1 1.417-.008z" clipRule="evenodd" />
+                        </svg>
                       </span>
                     )}
                   </button>
@@ -684,43 +740,6 @@ export default function StudioAppEditPage({ params }: PageProps) {
                 <h1 className="mb-4 text-base font-semibold text-zinc-900 dark:text-zinc-50">
                   {currentSectionName}
                 </h1>
-
-                {/* セクション表示切替（必須は常にオン・無効） */}
-                {(() => {
-                  const isRequired = focusedSection != null && SECTIONS.find((s) => s.id === focusedSection)?.necessary === 'required';
-                  const isOn = isRequired || !!(visibilityKey && (form[visibilityKey] as boolean));
-                  const isDisabled = isRequired;
-                  return (
-              <div className="mb-4 flex items-center gap-2">
-                <span className="text-sm text-zinc-600 dark:text-zinc-400">
-                  このセクションを表示
-                </span>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={isOn}
-                  aria-disabled={isDisabled}
-                  disabled={isDisabled}
-                  onClick={() => !isDisabled && visibilityKey && setVisibility(visibilityKey, !(form[visibilityKey] as boolean))}
-                  className={`relative inline-flex h-6 w-11 flex-shrink-0 rounded-full transition-colors focus:outline-none focus:ring-[0.7px] focus:ring-zinc-400 ${
-                    isDisabled
-                      ? 'cursor-not-allowed opacity-50'
-                      : ''
-                  } ${
-                    isOn
-                      ? 'bg-blue-600 dark:bg-blue-500'
-                      : 'bg-zinc-200 dark:bg-zinc-700'
-                  }`}
-                >
-                  <span
-                    className={`pointer-events-none absolute top-1 left-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${
-                      isOn ? 'translate-x-6' : 'translate-x-0'
-                    }`}
-                  />
-                </button>
-              </div>
-                  );
-                })()}
 
             <div className="space-y-4">
               {focusedSection === 'hero_header' && (

@@ -194,6 +194,16 @@ function SectionWrapper({
 export function AppPageView({ data: d, reviews = [], preview, onSectionFocus, focusedSectionId, onSectionHover, hoveredSectionId, appID }: AppPageViewProps) {
   const embedUrl = embedVideoUrl(ensureAbsoluteUrl(d.video_url));
   const galleryUrls = d.gallery_image_urls.filter(Boolean);
+  const hasVersionSection =
+    d.version_number.trim().length > 0 ||
+    d.release_notes.some((note) => note.version.trim() || note.body.trim() || (note.date ?? '').trim());
+  const hasVideoSection = Boolean(embedUrl);
+  const hasGallerySection = galleryUrls.length > 0;
+  const hasFreeTextSection = d.free_text_image_url.trim().length > 0 || d.free_text_markdown.trim().length > 0;
+  const hasUsersVoiceSection = reviews.length > 0 || d.users_voice_show_post_button;
+  const hasFeaturedSection = d.featured_items.some((item) => item.url.trim().length > 0);
+  const hasInquirySection = d.inquiry_url.trim().length > 0;
+  const hasSupportSection = Boolean(d.bmc_button_config || d.buy_me_a_coffee_url.trim());
   const { ref: galleryScrollRef, atStart: galleryAtStart, atEnd: galleryAtEnd } = useHorizontalFade();
   const { ref: reviewsScrollRef, atStart: reviewsAtStart, atEnd: reviewsAtEnd } = useHorizontalFade();
   const [showTestimonialForm, setShowTestimonialForm] = useState(false);
@@ -350,7 +360,7 @@ export function AppPageView({ data: d, reviews = [], preview, onSectionFocus, fo
         </SectionWrapper>
 
         {/* Version */}
-        {d.version_visible && (d.version_number || d.release_notes.length > 0) && (
+        {hasVersionSection && (
           <SectionWrapper
             sectionId="version"
             preview={preview}
@@ -394,7 +404,7 @@ export function AppPageView({ data: d, reviews = [], preview, onSectionFocus, fo
         )}
 
         {/* Video */}
-        {d.video_visible && embedUrl && (
+        {hasVideoSection && (
           <SectionWrapper
             sectionId="video"
             preview={preview}
@@ -418,7 +428,7 @@ export function AppPageView({ data: d, reviews = [], preview, onSectionFocus, fo
         )}
 
         {/* Gallery */}
-        {d.gallery_visible && galleryUrls.length > 0 && (
+        {hasGallerySection && (
           <SectionWrapper
             sectionId="gallery"
             preview={preview}
@@ -465,7 +475,7 @@ export function AppPageView({ data: d, reviews = [], preview, onSectionFocus, fo
         )}
 
         {/* Free Text */}
-        {d.free_text_visible && (d.free_text_image_url || d.free_text_markdown) && (
+        {hasFreeTextSection && (
           <SectionWrapper
             sectionId="free_text"
             preview={preview}
@@ -518,7 +528,7 @@ export function AppPageView({ data: d, reviews = [], preview, onSectionFocus, fo
         )}
 
         {/* Users' voice */}
-        {d.users_voice_visible && (
+        {hasUsersVoiceSection && (
           <SectionWrapper
             sectionId="users_voice"
             preview={preview}
@@ -662,7 +672,7 @@ export function AppPageView({ data: d, reviews = [], preview, onSectionFocus, fo
         )}
 
         {/* Featured（関連記事） */}
-        {d.featured_visible && d.featured_items.filter((i) => i.url.trim()).length > 0 && (
+        {hasFeaturedSection && (
           <SectionWrapper
             sectionId="featured"
             preview={preview}
@@ -729,7 +739,7 @@ export function AppPageView({ data: d, reviews = [], preview, onSectionFocus, fo
         )}
 
         {/* お問い合わせ */}
-        {d.inquiry_visible && d.inquiry_url.trim() && (
+        {hasInquirySection && (
           <SectionWrapper
             sectionId="inquiry"
             preview={preview}
@@ -827,7 +837,7 @@ export function AppPageView({ data: d, reviews = [], preview, onSectionFocus, fo
         </SectionWrapper>
 
         {/* Support */}
-        {d.support_visible && (d.bmc_button_config || d.buy_me_a_coffee_url) && (
+        {hasSupportSection && (
           <SectionWrapper
             sectionId="support"
             preview={preview}
