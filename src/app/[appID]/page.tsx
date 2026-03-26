@@ -65,6 +65,57 @@ export default function PublicAppPage({ params }: PageProps) {
 
     setData(appRowToFormState(appData as Record<string, unknown>));
 
+    // アプリのオーナーのプロフィール情報を読み込む（全プロジェクト共通）
+    if (appData?.user_id) {
+      const { data: profile } = await supabase
+        .from('developer_profiles')
+        .select('developer_id, developer_name, developer_bio, developer_github, developer_x, developer_image')
+        .eq('user_id', appData.user_id)
+        .maybeSingle();
+      if (profile) {
+        setData((prev) =>
+          prev
+            ? {
+                ...prev,
+                developer_name: profile.developer_name ?? '',
+                developer_id: profile.developer_id ?? '',
+                developer_bio: profile.developer_bio ?? '',
+                developer_github: profile.developer_github ?? '',
+                developer_x: profile.developer_x ?? '',
+                developer_icon_url: profile.developer_image ?? '',
+              }
+            : null
+        );
+      } else {
+        // developer_profiles 未設定の場合は apps の古い値を使わない
+        setData((prev) =>
+          prev
+            ? {
+                ...prev,
+                developer_name: '',
+                developer_bio: '',
+                developer_github: '',
+                developer_x: '',
+                developer_icon_url: '',
+              }
+            : null
+        );
+      }
+    } else {
+      // user_id なしでも、旧 app 値は無効化
+      setData((prev) =>
+        prev
+          ? {
+              ...prev,
+              developer_name: '',
+              developer_bio: '',
+              developer_github: '',
+              developer_x: '',
+            }
+          : null
+      );
+    }
+
     const { data: reviewsData } = await supabase
       .from('reviews')
       .select('id, user_icon_url, user_name, content, created_at')

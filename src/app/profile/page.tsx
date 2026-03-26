@@ -1,16 +1,44 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import {
   FORM_ERROR_CLASS,
+  FORM_INPUT_CLASS,
   PREFIX_INPUT_CLASS,
   PREFIX_INPUT_WRAPPER_CLASS,
   PREFIX_TEXT_CLASS,
   FormLabel,
 } from '@/components/FormField';
+import { ImageUploadInput } from '@/components/ImageUploadInput';
+
+function SpinnerIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      fill="none"
+      viewBox="0 0 24 24"
+      className={className}
+      aria-hidden
+    >
+      <circle
+        cx="12"
+        cy="12"
+        r="10"
+        stroke="currentColor"
+        strokeWidth="4"
+        className="opacity-25"
+      />
+      <path
+        fill="currentColor"
+        className="opacity-75"
+        d="m4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+      />
+    </svg>
+  );
+}
 
 const DEVELOPER_ID_REGEX = /^[a-z0-9_-]+$/;
 
@@ -21,8 +49,20 @@ export default function ProfilePage() {
   const [checking, setChecking] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const [developerId, setDeveloperId] = useState('');
-  const [developerError, setDeveloperError] = useState<string | null>(null);
+  const [developerImage, setDeveloperImage] = useState('');
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const [serverError, setServerError] = useState<string | null>(null);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
+
+  const developerError = useMemo(() => {
+    const trimmed = developerId.trim().toLowerCase();
+    if (!trimmed) return null;
+    if (!DEVELOPER_ID_REGEX.test(trimmed)) {
+      return '小文字英数字・ハイフン・アンダースコアのみ使用できます。';
+    }
+    return null;
+  }, [developerId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -40,7 +80,7 @@ export default function ProfilePage() {
 
       const { data: profile, error: profileError } = await supabase
         .from('developer_profiles')
-        .select('developer_id')
+        .select('developer_id, developer_image, developer_name, developer_bio')
         .eq('user_id', user.id)
         .maybeSingle();
       if (!cancelled) {
@@ -48,6 +88,9 @@ export default function ProfilePage() {
           console.error(profileError);
         } else {
           setDeveloperId(profile?.developer_id ?? '');
+          setDeveloperImage(profile?.developer_image ?? '');
+          setName(profile?.developer_name ?? '');
+          setDescription(profile?.developer_bio ?? '');
         }
         setLoading(false);
       }
@@ -58,17 +101,13 @@ export default function ProfilePage() {
   }, [router]);
 
   useEffect(() => {
-    if (!userId) return;
+    if (!userId || !developerId.trim()) return;
+
     const trimmed = developerId.trim().toLowerCase();
-    if (!trimmed) {
-      setDeveloperError(null);
-      return;
-    }
     if (!DEVELOPER_ID_REGEX.test(trimmed)) {
-      setDeveloperError('小文字英数字・ハイフン・アンダースコアのみ使用できます。');
       return;
     }
-    setDeveloperError(null);
+
     const timer = setTimeout(async () => {
       setChecking(true);
       const { data, error } = await supabase
@@ -79,10 +118,13 @@ export default function ProfilePage() {
       setChecking(false);
       if (error) {
         console.error(error);
+        setServerError('サーバーエラーが発生しました。');
         return;
       }
       if (data && data.user_id !== userId) {
-        setDeveloperError('この開発者IDはすでに使用されています。別のIDを選んでください。');
+        setServerError('この開発者IDはすでに使用されています。別のIDを選んでください。');
+      } else {
+        setServerError(null);
       }
     }, 350);
     return () => clearTimeout(timer);
@@ -91,7 +133,7 @@ export default function ProfilePage() {
   const handleSave = async () => {
     if (!userId) return;
     setSaveMessage(null);
-    setDeveloperError(null);
+    setServerError(null);
 
     const trimmed = developerId.trim().toLowerCase();
     if (!trimmed) {
@@ -101,7 +143,7 @@ export default function ProfilePage() {
       setSaving(false);
       if (error) {
         console.error(error);
-        setDeveloperError('保存に失敗しました。時間をおいて再度お試しください。');
+        setServerError('保存に失敗しました。時間をおいて再度お試しください。');
         return;
       }
       setSaveMessage('開発者IDを未設定にしました。');
@@ -109,7 +151,7 @@ export default function ProfilePage() {
     }
 
     if (!DEVELOPER_ID_REGEX.test(trimmed)) {
-      setDeveloperError('小文字英数字・ハイフン・アンダースコアのみ使用できます。');
+      setServerError('小文字英数字・ハイフン・アンダースコアのみ使用できます。');
       return;
     }
 
@@ -119,7 +161,7 @@ export default function ProfilePage() {
       .eq('developer_id', trimmed)
       .maybeSingle();
     if (taken && taken.user_id !== userId) {
-      setDeveloperError('この開発者IDはすでに使用されています。別のIDを選んでください。');
+      setServerError('この開発者IDはすでに使用されています。別のIDを選んでください。');
       return;
     }
 
@@ -127,13 +169,13 @@ export default function ProfilePage() {
     const { error } = await supabase
       .from('developer_profiles')
       .upsert(
-        { user_id: userId, developer_id: trimmed, updated_at: new Date().toISOString() },
+        { user_id: userId, developer_id: trimmed, developer_image: developerImage, developer_name: name, developer_bio: description, updated_at: new Date().toISOString() },
         { onConflict: 'user_id' }
       );
     setSaving(false);
     if (error) {
       console.error(error);
-      setDeveloperError('保存に失敗しました。時間をおいて再度お試しください。');
+      setServerError('保存に失敗しました。時間をおいて再度お試しください。');
       return;
     }
     setDeveloperId(trimmed);
@@ -148,18 +190,34 @@ export default function ProfilePage() {
           <span className="mx-2">/</span>
           <span className="text-zinc-800 dark:text-zinc-200">開発者プロフィール</span>
         </nav>
-        <h1 className="mb-2 text-xl font-semibold text-zinc-900 dark:text-zinc-50">
+        <h1 className="mb-4 text-xl font-semibold text-zinc-900 dark:text-zinc-50">
           開発者プロフィール
         </h1>
-        <p className="mb-6 text-sm text-zinc-600 dark:text-zinc-400">
-          公開用の開発者IDを設定できます。
-        </p>
 
-        <div className="rounded-2xl bg-zinc-100 p-6 dark:bg-zinc-900">
-          {loading ? (
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">読み込み中...</p>
-          ) : (
+        {loading ? (
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">読み込み中...</p>
+        ) : (
+          <section className="rounded-xl bg-white p-4 dark:bg-zinc-900">
             <div className="space-y-4">
+              <div>
+                <ImageUploadInput
+                  label="プロフィール画像"
+                  value={developerImage}
+                  onChange={setDeveloperImage}
+                  pathPrefix="profile-images"
+                />
+              </div>
+              <div>
+                <FormLabel htmlFor="name">名前</FormLabel>
+                <input
+                  id="name"
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="表示名"
+                  className={FORM_INPUT_CLASS}
+                />
+              </div>
               <div>
                 <FormLabel htmlFor="developer-id" optional>開発者ID</FormLabel>
                 <div className={PREFIX_INPUT_WRAPPER_CLASS}>
@@ -169,18 +227,30 @@ export default function ProfilePage() {
                       id="developer-id"
                       type="text"
                       value={developerId}
-                      onChange={(e) => setDeveloperId(e.target.value.toLowerCase())}
+                      onChange={(e) => {
+                        setDeveloperId(e.target.value.toLowerCase());
+                        setServerError(null);
+                      }}
                       placeholder="my-handle"
                       className={PREFIX_INPUT_CLASS}
                     />
                     {checking && (
-                      <span className="pointer-events-none absolute right-2 text-xs text-zinc-400 dark:text-zinc-500">
-                        確認中...
-                      </span>
+                      <SpinnerIcon className="pointer-events-none absolute right-2 h-4 w-4 animate-spin text-zinc-400 dark:text-zinc-500" />
                     )}
                   </div>
                 </div>
-                {developerError && <p className={FORM_ERROR_CLASS}>{developerError}</p>}
+                {(developerError || serverError) && <p className={FORM_ERROR_CLASS}>{developerError || serverError}</p>}
+              </div>
+              <div>
+                <FormLabel htmlFor="description">説明</FormLabel>
+                <textarea
+                  id="description"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="自己紹介や経歴など"
+                  rows={3}
+                  className={FORM_INPUT_CLASS}
+                />
               </div>
 
               {saveMessage && (
@@ -196,13 +266,10 @@ export default function ProfilePage() {
                 >
                   {saving ? '保存中...' : '保存'}
                 </button>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                  空にして保存すると未設定に戻せます。
-                </p>
               </div>
             </div>
-          )}
-        </div>
+          </section>
+        )}
       </div>
     </div>
   );

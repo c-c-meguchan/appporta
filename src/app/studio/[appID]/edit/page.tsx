@@ -25,7 +25,7 @@ const REQUIRED_FIELD_DEFAULTS: Record<string, string> = {
   developer_name: '開発者名',
   developer_bio: '自己紹介を入力してください',
 };
-const REQUIRED_TEXT_FIELDS: Array<keyof AppFormState> = [
+const REQUIRED_TEXT_FIELDS = [
   'name',
   'catch_copy',
   'primary_link',
@@ -33,7 +33,7 @@ const REQUIRED_TEXT_FIELDS: Array<keyof AppFormState> = [
   'file_size',
   'developer_name',
   'developer_bio',
-];
+] as const;
 
 function hasSectionContent(sectionId: SectionId, form: AppFormState, reviewCount = 0): boolean {
   switch (sectionId) {
@@ -71,7 +71,7 @@ function withRequiredDefaults(state: AppFormState): AppFormState {
   for (const key of REQUIRED_TEXT_FIELDS) {
     const val = next[key];
     if (typeof val === 'string' && !val.trim()) {
-      next[key] = REQUIRED_FIELD_DEFAULTS[key] as any;
+      next[key] = REQUIRED_FIELD_DEFAULTS[key];
     }
   }
   return next;
@@ -81,13 +81,13 @@ function validateRequiredFields(state: AppFormState): string | null {
   for (const key of REQUIRED_TEXT_FIELDS) {
     const val = state[key];
     if (typeof val === 'string' && !val.trim()) {
-      return `${REQUIRED_FIELD_DEFAULTS[key]} は必須です。空にできません。`;
+      return `${REQUIRED_FIELD_DEFAULTS[key as keyof typeof REQUIRED_FIELD_DEFAULTS]} は必須です。空にできません。`;
     }
   }
   return null;
 }
 
-function parseJsonArray(val: unknown, fallback: any[]): any[] {
+function parseJsonArray(val: unknown, fallback: unknown[]): unknown[] {
   if (Array.isArray(val)) return val;
   if (typeof val === 'string') {
     try {
@@ -102,22 +102,28 @@ function parseJsonArray(val: unknown, fallback: any[]): any[] {
 
 function parseReleaseNotes(val: unknown): ReleaseNote[] {
   const a = parseJsonArray(val, []);
-  return a.map((x: any) => ({
-    version: typeof x?.version === 'string' ? x.version : '',
-    body: typeof x?.body === 'string' ? x.body : '',
-    date: typeof x?.date === 'string' ? x.date : undefined,
-  }));
+  return a.map((x: unknown) => {
+    const o = x as Record<string, unknown>;
+    return {
+      version: typeof o.version === 'string' ? o.version : '',
+      body: typeof o.body === 'string' ? o.body : '',
+      date: typeof o.date === 'string' ? o.date : undefined,
+    };
+  });
 }
 
 function parseFeaturedItems(val: unknown): FeaturedItem[] {
   const a = parseJsonArray(val, []);
-  return a.map((x: any) => ({
-    url: typeof x?.url === 'string' ? x.url : '',
-    note: typeof x?.note === 'string' ? x.note : '',
-    title: typeof x?.title === 'string' ? x.title : undefined,
-    description: typeof x?.description === 'string' ? x.description : undefined,
-    image_url: typeof x?.image_url === 'string' ? x.image_url : undefined,
-  }));
+  return a.map((x: unknown) => {
+    const o = x as Record<string, unknown>;
+    return {
+      url: typeof o.url === 'string' ? o.url : '',
+      note: typeof o.note === 'string' ? o.note : '',
+      title: typeof o.title === 'string' ? o.title : undefined,
+      description: typeof o.description === 'string' ? o.description : undefined,
+      image_url: typeof o.image_url === 'string' ? o.image_url : undefined,
+    };
+  });
 }
 
 /** 価格をカンマ区切りで表示（保存値はカンマなし） */
@@ -159,12 +165,10 @@ function CloudUploadIcon({ className }: { className?: string }) {
 }
 
 function ImageUploadInput({ label, value, onChange, pathPrefix }: ImageUploadInputProps) {
-  const [uploading, setUploading] = useState(false);
   const [showUrlInput, setShowUrlInput] = useState(false);
 
   const uploadFile = async (file: File) => {
     try {
-      setUploading(true);
       const ext = file.name.split('.').pop() || 'png';
       const filePath = `${pathPrefix}/${crypto.randomUUID()}.${ext}`;
       const { error } = await supabase.storage.from(IMAGE_BUCKET).upload(filePath, file);
@@ -174,8 +178,6 @@ function ImageUploadInput({ label, value, onChange, pathPrefix }: ImageUploadInp
     } catch (e) {
       console.error(e);
       alert('画像のアップロードに失敗しました。時間をおいて再度お試しください。');
-    } finally {
-      setUploading(false);
     }
   };
 
@@ -326,6 +328,35 @@ export default function StudioAppEditPage({ params }: PageProps) {
         ? r.users_voice_show_post_button
         : Boolean(r.users_voice_visible);
 
+    // 開発者プロフィール情報を読み込む（全プロジェクト共通で使用）
+    // Profile data takes precedence to ensure consistency between public and edit views
+    let developerName = '';
+    let developerBio = '';
+    let developerGithub = '';
+    let developerX = '';
+    let developerId = '';
+    let developerImageUrl = '';
+
+    // 認証ユーザーのプロフィール情報があればそれを適用
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (user) {
+      const { data: profile } = await supabase
+        .from('developer_profiles')
+        .select('developer_id, developer_name, developer_bio, developer_github, developer_x, developer_image')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      if (profile) {
+        developerName = profile.developer_name ?? '';
+        developerBio = profile.developer_bio ?? '';
+        developerGithub = profile.developer_github ?? '';
+        developerX = profile.developer_x ?? '';
+        developerId = profile.developer_id ?? '';
+        developerImageUrl = profile.developer_image ?? '';
+      }
+    }
+
     const nextForm = withRequiredDefaults({
       name: String(r.name ?? ''),
       catch_copy: String(r.catch_copy ?? ''),
@@ -355,12 +386,12 @@ export default function StudioAppEditPage({ params }: PageProps) {
       featured_items: parseFeaturedItems(r.featured_items),
       inquiry_visible: Boolean(r.inquiry_visible),
       inquiry_url: String(r.inquiry_url ?? ''),
-      developer_icon_url: String(r.developer_icon_url ?? ''),
-      developer_name: String(r.developer_name ?? ''),
-      developer_bio: String(r.developer_bio ?? ''),
-      developer_github: String(r.developer_github ?? ''),
-      developer_x: String(r.developer_x ?? ''),
-      developer_contact_url: String(r.developer_contact_url ?? ''),
+      developer_icon_url: developerImageUrl,
+      developer_name: developerName,
+      developer_id: developerId,
+      developer_bio: developerBio,
+      developer_github: developerGithub,
+      developer_x: developerX,
       support_visible: Boolean(r.support_visible),
       buy_me_a_coffee_url: String(r.buy_me_a_coffee_url ?? ''),
       bmc_button_config: parseBmcButtonConfig(r.bmc_button_config),
@@ -454,12 +485,6 @@ export default function StudioAppEditPage({ params }: PageProps) {
       featured_items: form.featured_items,
       inquiry_visible: visibility.inquiry_visible,
       inquiry_url: form.inquiry_url.trim() || null,
-      developer_icon_url: form.developer_icon_url.trim() || null,
-      developer_name: form.developer_name.trim() || null,
-      developer_bio: form.developer_bio.trim() || null,
-      developer_github: form.developer_github.trim() || null,
-      developer_x: form.developer_x.trim() || null,
-      developer_contact_url: form.developer_contact_url.trim() || null,
       support_visible: visibility.support_visible,
       buy_me_a_coffee_url: bmcInputMode === 'url' ? (form.buy_me_a_coffee_url.trim() || null) : null,
       bmc_button_config: bmcInputMode === 'code' ? form.bmc_button_config : null,
@@ -1112,68 +1137,16 @@ export default function StudioAppEditPage({ params }: PageProps) {
               )}
 
               {focusedSection === 'developer' && (
-                <>
-                  <ImageUploadInput
-                    label="開発者アイコン"
-                    value={form.developer_icon_url}
-                    onChange={(url) => updateForm({ developer_icon_url: url })}
-                    pathPrefix={`${appID}/developer`}
-                  />
-                  <div>
-                    <label className={LABEL_CLASS}>開発者名</label>
-                    <input
-                      type="text"
-                      value={form.developer_name}
-                      onChange={(e) => updateForm({ developer_name: e.target.value })}
-                      placeholder="名前"
-                      className={INPUT_CLASS}
-                    />
-                  </div>
-                  <div>
-                    <label className={LABEL_CLASS}>Bio</label>
-                    <textarea
-                      value={form.developer_bio}
-                      onChange={(e) => updateForm({ developer_bio: e.target.value })}
-                      placeholder="自己紹介"
-                      rows={3}
-                      className={INPUT_CLASS}
-                    />
-                  </div>
-                  <div>
-                    <label className={LABEL_CLASS}>GitHub URL</label>
-                    <input
-                      type="url"
-                      value={form.developer_github}
-                      onChange={(e) =>
-                        updateForm({ developer_github: e.target.value })
-                      }
-                      placeholder="https://github.com/..."
-                      className={INPUT_CLASS}
-                    />
-                  </div>
-                  <div>
-                    <label className={LABEL_CLASS}>X (Twitter) URL</label>
-                    <input
-                      type="url"
-                      value={form.developer_x}
-                      onChange={(e) => updateForm({ developer_x: e.target.value })}
-                      placeholder="https://x.com/..."
-                      className={INPUT_CLASS}
-                    />
-                  </div>
-                  <div>
-                    <label className={LABEL_CLASS}>お問い合わせリンク</label>
-                    <input
-                      type="url"
-                      value={form.developer_contact_url}
-                      onChange={(e) =>
-                        updateForm({ developer_contact_url: e.target.value })
-                      }
-                      placeholder="https://..."
-                      className={INPUT_CLASS}
-                    />
-                  </div>
-                </>
+                <div className="space-y-4">
+                  <a
+                    href="/profile"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center justify-center rounded-lg border-[0.7px] border-zinc-900 bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-zinc-800 dark:border-zinc-50 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-200"
+                  >
+                    開発者プロフィール設定へ
+                  </a>
+                </div>
               )}
 
               {focusedSection === 'support' && (

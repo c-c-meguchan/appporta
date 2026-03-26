@@ -4,9 +4,9 @@ import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
 const IMAGE_BUCKET = 'app-images';
-const LABEL_CLASS = 'block text-xs font-medium text-zinc-800 dark:text-zinc-200 mb-1';
+const LABEL_CLASS = 'block text-xs font-medium text-[var(--text-primary)] mb-1';
 const INPUT_CLASS =
-  'w-full rounded-lg bg-zinc-100 px-3 py-2 text-sm text-zinc-900 outline-none transition placeholder:text-zinc-500 focus:bg-zinc-200 focus:ring-[0.7px] focus:ring-zinc-300 dark:bg-zinc-800 dark:text-zinc-50 dark:placeholder:text-zinc-400 dark:focus:bg-zinc-700 dark:focus:ring-zinc-600';
+  'w-full rounded-lg bg-[var(--input-bg)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-muted)] focus:bg-[var(--input-focus-bg)] focus:ring-[0.7px] focus:ring-[var(--input-focus-ring)]';
 
 function CloudUploadIcon({ className }: { className?: string }) {
   return (

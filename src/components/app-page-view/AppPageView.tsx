@@ -10,7 +10,7 @@ const REMARK_PLUGINS = [remarkGfm];
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const MARKDOWN_COMPONENTS = {
   // 見出し行(th)は prose のデフォルト太字のまま。データ行(td)のみ font-weight を明示
-  td: ({ node, style, children, ...props }: any) => (
+  td: ({ style, children, ...props }: any) => (
     <td {...props} style={{ ...style, fontWeight: 'normal' }}>{children}</td>
   ),
 };
@@ -62,7 +62,7 @@ function useHorizontalFade() {
       el.removeEventListener('scroll', update);
       window.removeEventListener('resize', update);
     };
-  }, [ref.current]);
+  }, [ref]);
 
   return { ref, atStart, atEnd };
 }
@@ -110,9 +110,9 @@ function ensureAbsoluteUrl(url: string): string {
   return `https://${u}`;
 }
 
-function embedVideoUrl(url: string): string | null {
+function embedVideoUrl(url: string): string | undefined {
   const u = url.trim();
-  if (!u) return null;
+  if (!u) return undefined;
   try {
     const parsed = new URL(u);
     const host = parsed.hostname;
@@ -120,16 +120,16 @@ function embedVideoUrl(url: string): string | null {
       const v = host.includes('youtu.be')
         ? parsed.pathname.slice(1)
         : parsed.searchParams.get('v');
-      return v ? `https://www.youtube.com/embed/${v}` : null;
+      return v ? `https://www.youtube.com/embed/${v}` : undefined;
     }
     if (host.includes('vimeo.com')) {
       const m = parsed.pathname.match(/\/(\d+)/);
-      return m ? `https://player.vimeo.com/video/${m[1]}` : null;
+      return m ? `https://player.vimeo.com/video/${m[1]}` : undefined;
     }
   } catch {
     // ignore
   }
-  return null;
+  return undefined;
 }
 
 /** 価格をカンマ区切りで表示 */
@@ -210,7 +210,6 @@ export function AppPageView({ data: d, reviews = [], preview, onSectionFocus, fo
   const [expandedReview, setExpandedReview] = useState<ReviewItem | null>(null);
   const heroSectionRef = useRef<HTMLDivElement>(null);
   const [showStickyNav, setShowStickyNav] = useState(false);
-  const [stickyNavRevealed, setStickyNavRevealed] = useState(false);
 
   const freeTextRef = useRef<HTMLDivElement>(null);
   const [freeTextExpanded, setFreeTextExpanded] = useState(false);
@@ -239,14 +238,7 @@ export function AppPageView({ data: d, reviews = [], preview, onSectionFocus, fo
     return () => observer.disconnect();
   }, []);
 
-  // スティッキーナビのふわっと出現（1フレーム待ってから transition で表示）
-  useEffect(() => {
-    if (showStickyNav) {
-      const id = requestAnimationFrame(() => setStickyNavRevealed(true));
-      return () => cancelAnimationFrame(id);
-    }
-    setStickyNavRevealed(false);
-  }, [showStickyNav]);
+
 
   useEffect(() => {
     const el = freeTextRef.current;
@@ -794,6 +786,9 @@ export function AppPageView({ data: d, reviews = [], preview, onSectionFocus, fo
             />
             <div className="flex-1 text-center sm:text-left">
               <p className="font-medium">{d.developer_name || '開発者'}</p>
+              {d.developer_id && (
+                <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">@{d.developer_id}</p>
+              )}
               {d.developer_bio && (
                 <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
                   {d.developer_bio}
@@ -818,16 +813,6 @@ export function AppPageView({ data: d, reviews = [], preview, onSectionFocus, fo
                     className="text-sm text-zinc-600 hover:underline dark:text-zinc-400"
                   >
                     X
-                  </a>
-                )}
-                {d.developer_contact_url && (
-                  <a
-                    href={preview ? '#' : ensureAbsoluteUrl(d.developer_contact_url)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="rounded-lg bg-zinc-900 px-4 py-1.5 text-sm font-medium text-white hover:bg-zinc-800 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-200"
-                  >
-                    お問い合わせ
                   </a>
                 )}
               </div>

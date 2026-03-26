@@ -141,10 +141,10 @@ export type AppFormState = {
   inquiry_url: string;
   developer_icon_url: string;
   developer_name: string;
+  developer_id: string;
   developer_bio: string;
   developer_github: string;
   developer_x: string;
-  developer_contact_url: string;
   support_visible: boolean;
   buy_me_a_coffee_url: string;
   bmc_button_config: BmcButtonConfig | null;
@@ -184,10 +184,10 @@ export const defaultFormState: AppFormState = {
   inquiry_url: '',
   developer_icon_url: '',
   developer_name: '',
+  developer_id: '',
   developer_bio: '',
   developer_github: '',
   developer_x: '',
-  developer_contact_url: '',
   support_visible: false,
   buy_me_a_coffee_url: '',
   bmc_button_config: null,
